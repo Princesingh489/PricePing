@@ -1,0 +1,176 @@
+import { useState } from 'react';
+import { useTheme, THEME_PRESETS } from '../contexts/ThemeContext';
+import { useLanguage } from '../contexts/LanguageContext';
+import { productsApi } from '../services/api';
+import toast from 'react-hot-toast';
+import {
+  Search, Sparkles, Mic, Loader2, X
+} from 'lucide-react';
+import QuickTrackModal from './QuickTrackModal';
+
+interface Props {
+  onProductTracked?: () => void;
+}
+
+export default function HeroTrackerSection({ onProductTracked }: Props) {
+  const { settings } = useTheme();
+  const { t } = useLanguage();
+  const [urlInput, setUrlInput] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [activeModalProduct, setActiveModalProduct] = useState<any>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+
+  const currentPreset = THEME_PRESETS[settings.heroTheme] || THEME_PRESETS.festive;
+
+  // Background style computation
+  const bannerImage = settings.heroTheme === 'custom' && settings.customImageUrl
+    ? settings.customImageUrl
+    : currentPreset.bannerUrl;
+
+  const handleSearchOrTrack = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const query = urlInput.trim();
+    if (!query) {
+      toast.error('Please paste a product URL or search term');
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      let cleanQuery = query;
+      if (!cleanQuery.startsWith('http://') && !cleanQuery.startsWith('https://')) {
+        if (cleanQuery.includes('amazon.') || cleanQuery.includes('amzn.') || cleanQuery.includes('flipkart.') || cleanQuery.includes('myntra.') || cleanQuery.includes('ajio.') || cleanQuery.includes('nykaa.')) {
+          cleanQuery = 'https://' + cleanQuery;
+        }
+      }
+      const res = await productsApi.resolveUrl(cleanQuery);
+      setActiveModalProduct(res.data);
+      setModalOpen(true);
+      if (onProductTracked) onProductTracked();
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || 'Could not resolve product. Please check the URL or product name.');
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  return (
+    <>
+      <section className="relative w-full overflow-hidden bg-[#24001d] text-white transition-all duration-500">
+        {/* Rich Festive Wallpaper Image Layer */}
+        <div
+          className="absolute inset-0 bg-cover bg-center transition-all duration-500"
+          style={{
+            backgroundImage: bannerImage ? `url(${bannerImage})` : undefined,
+            background: !bannerImage ? currentPreset.gradient : undefined,
+            filter: `brightness(${settings.bannerBrightness}%)`,
+          }}
+        />
+
+        {/* Ambient Overlay to blend seamless text readability */}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-[#300325]/50 to-[#22001c]/90 pointer-events-none" />
+
+        {/* Hero Content Container */}
+        <div className="relative z-10 px-4 py-12 sm:py-16 lg:py-20 max-w-5xl mx-auto text-center flex flex-col items-center">
+          {/* Top Pill Badge */}
+          <div className="inline-flex items-center gap-1.5 px-4 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-amber-300 text-xs font-semibold shadow-sm mb-5">
+            <Sparkles className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+            <span>Price History & Tracker</span>
+          </div>
+
+          {/* Main Headline */}
+          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-[54px] font-black text-white tracking-tight leading-[1.15] max-w-4xl drop-shadow-md">
+            {t('hero_title', 'Never Overpay. Let PricePing Find the Right Price.')}
+          </h1>
+
+          {/* Subtitle */}
+          <p className="mt-3 text-base sm:text-lg text-gray-200 font-normal drop-shadow">
+            {t('hero_subtitle', 'Compare prices, watch price history, and get alerted when it’s finally worth buying.')}
+          </p>
+
+          {/* Main Search & URL Tracker Input Bar */}
+          <form
+            onSubmit={handleSearchOrTrack}
+            className="w-full max-w-3xl mt-7 relative"
+          >
+            <div className="relative flex items-center bg-white rounded-full p-1 sm:p-2 shadow-2xl shadow-black/70 border border-white/40 focus-within:ring-4 focus-within:ring-indigo-500/30 transition-all">
+              {/* Search Icon */}
+              <div className="pl-3 sm:pl-4 text-gray-400 flex-shrink-0">
+                <Search className="w-4 h-4 sm:w-5 sm:h-5" />
+              </div>
+
+              {/* Input Field */}
+              <input
+                type="text"
+                value={urlInput}
+                onChange={(e) => setUrlInput(e.target.value)}
+                placeholder={t('hero_placeholder', 'Search or paste any Amazon, Flipkart, Myntra, AJIO, Nykaa link...')}
+                className="w-full min-w-0 flex-1 bg-transparent px-2.5 sm:px-3 py-2 sm:py-3 text-xs sm:text-sm md:text-[15px] text-gray-900 placeholder-gray-400 font-medium focus:outline-none"
+              />
+
+              {/* Clear button if text */}
+              {urlInput && (
+                <button
+                  type="button"
+                  onClick={() => setUrlInput('')}
+                  className="p-1 rounded-full text-gray-400 hover:text-gray-600 mr-1 flex-shrink-0"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+
+              {/* Supported Platforms Bubbles inside search */}
+              <div className="hidden md:flex items-center gap-1.5 px-2 py-1 text-[11px] font-semibold text-gray-500 mr-2 flex-shrink-0">
+                <span>supports</span>
+                <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center text-[8px] font-black" title="Flipkart">FK</span>
+                <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center text-[8px] font-black" title="Amazon">AZ</span>
+                <span className="w-5 h-5 rounded-full bg-pink-100 text-pink-700 flex items-center justify-center text-[8px] font-black" title="Nykaa">NY</span>
+                <span className="w-5 h-5 rounded-full bg-purple-100 text-purple-800 flex items-center justify-center text-[8px] font-black" title="100+ Stores">99+</span>
+              </div>
+
+              {/* Voice / Mic Icon */}
+              <button
+                type="button"
+                onClick={() => toast('Voice search: Say a product name...')}
+                className="p-1.5 sm:p-2 rounded-full text-gray-400 hover:text-indigo-600 transition-colors mr-0.5 sm:mr-1 flex-shrink-0"
+                title="Voice Search"
+              >
+                <Mic className="w-4 h-4" />
+              </button>
+
+              {/* Submit CTA Button */}
+              <button
+                type="submit"
+                disabled={isSearching}
+                className="px-3.5 sm:px-6 py-2 sm:py-3 rounded-full bg-[#4139d4] hover:bg-[#342cb8] text-white font-bold text-xs sm:text-sm tracking-wide shadow-md transition-all flex items-center gap-1.5 sm:gap-2 flex-shrink-0 cursor-pointer disabled:opacity-60 whitespace-nowrap"
+              >
+                {isSearching ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" />
+                    <span>Finding...</span>
+                  </>
+                ) : (
+                  <span>{t('find_best_price', 'Find Best Price')}</span>
+                )}
+              </button>
+            </div>
+          </form>
+
+          {/* Sub-search Callout Capsule Pill */}
+          <div className="mt-4 px-3 sm:px-4 py-1.5 rounded-full bg-black/40 backdrop-blur-md border border-white/15 text-[11px] sm:text-xs text-gray-200 font-medium flex items-center justify-center gap-1.5 flex-wrap shadow-sm text-center">
+            <span>🍧</span>
+            <span><strong>Find Best Price</strong> by adding <span className="text-amber-300 font-bold">priceping.in/</span> before any product link • Works with <strong className="text-amber-200">Amazon, Flipkart, AJIO, Myntra & Nykaa</strong></span>
+          </div>
+        </div>
+      </section>
+
+      {/* Quick Track Modal */}
+      <QuickTrackModal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        initialProduct={activeModalProduct}
+        onSuccessTrack={onProductTracked}
+      />
+    </>
+  );
+}

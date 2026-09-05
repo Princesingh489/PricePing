@@ -1,0 +1,158 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-gray-200/80;
+  }
+  body {
+    @apply bg-[#f8fafc] text-navy-900 font-sans antialiased selection:bg-indigo-500/25 selection:text-indigo-900 min-h-screen;
+    background-image: 
+      radial-gradient(at 10% 10%, rgba(99, 102, 241, 0.03) 0px, transparent 45%),
+      radial-gradient(at 90% 90%, rgba(168, 85, 247, 0.03) 0px, transparent 45%);
+    background-attachment: fixed;
+  }
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-slate-100;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-slate-300 rounded-full hover:bg-slate-400;
+  }
+}
+
+@layer components {
+  /* Cards */
+  .card {
+    @apply bg-white rounded-2xl border border-gray-200/90 shadow-card-soft relative overflow-hidden;
+  }
+  .card-hover {
+    @apply card transition-all duration-300 hover:border-indigo-300 hover:shadow-card-hover hover:-translate-y-1;
+  }
+  .glass-card {
+    @apply bg-white/90 backdrop-blur-xl rounded-2xl border border-gray-200/80 shadow-card-soft;
+  }
+
+  /* High-Grade Buttons */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 bg-gradient-brand text-white font-bold px-5 py-2.5 rounded-xl
+           shadow-md shadow-indigo-500/25 hover:shadow-glow-brand hover:brightness-105 hover:scale-[1.01]
+           active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-none
+           transition-all duration-200 cursor-pointer text-sm tracking-wide;
+  }
+  
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 bg-white hover:bg-gray-50 text-navy-800 font-semibold px-4 py-2.5 rounded-xl
+           border border-gray-200 hover:border-indigo-300 hover:text-indigo-600 hover:shadow-sm hover:scale-[1.01]
+           active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 cursor-pointer text-sm;
+  }
+
+  .btn-success {
+    @apply inline-flex items-center justify-center gap-2 bg-gradient-success text-white font-bold px-5 py-2.5 rounded-xl
+           shadow-md shadow-emerald-500/20 hover:shadow-glow-success hover:brightness-105 hover:scale-[1.01]
+           active:scale-[0.98] disabled:opacity-50 transition-all duration-200 cursor-pointer text-sm;
+  }
+
+  .btn-cyan {
+    @apply inline-flex items-center justify-center gap-2 bg-cyan-600 hover:bg-cyan-700 text-white font-bold px-4 py-2 rounded-xl
+           shadow-sm shadow-cyan-500/20 hover:brightness-105 hover:scale-[1.01]
+           active:scale-[0.98] transition-all duration-200 cursor-pointer text-xs;
+  }
+
+  .btn-warm {
+    @apply inline-flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-bold px-4 py-2 rounded-xl
+           shadow-sm shadow-amber-500/20 hover:brightness-105 hover:scale-[1.01]
+           active:scale-[0.98] transition-all duration-200 cursor-pointer text-xs;
+  }
+
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 bg-rose-600 hover:bg-rose-700 text-white font-semibold px-4 py-2 rounded-xl
+           shadow-sm shadow-rose-500/20 hover:brightness-105 hover:scale-[1.01]
+           active:scale-[0.98] transition-all duration-200 cursor-pointer text-xs;
+  }
+
+  .btn-danger-outline {
+    @apply inline-flex items-center justify-center gap-2 bg-rose-50 text-rose-600 font-semibold px-4 py-2 rounded-xl
+           border border-rose-200 hover:bg-rose-100 hover:border-rose-300 hover:text-rose-700
+           active:scale-[0.98] transition-all duration-200 cursor-pointer text-xs;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-1.5 p-2 rounded-xl text-gray-500 hover:text-navy-900
+           hover:bg-gray-100 active:scale-[0.95] transition-all duration-200 cursor-pointer;
+  }
+
+  .btn-pill {
+    @apply px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 cursor-pointer;
+  }
+
+  /* Form Inputs */
+  .input {
+    @apply w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-navy-900
+           placeholder-gray-400 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20
+           transition-all duration-200 text-sm;
+  }
+  .label {
+    @apply block text-xs font-bold text-navy-700 uppercase tracking-wider mb-1.5;
+  }
+
+  /* Store & Status Badges */
+  .badge {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold tracking-wide;
+  }
+  .badge-amazon {
+    @apply badge bg-orange-50 text-orange-700 border border-orange-200;
+  }
+  .badge-flipkart {
+    @apply badge bg-blue-50 text-blue-700 border border-blue-200;
+  }
+  .badge-ajio {
+    @apply badge bg-rose-50 text-rose-700 border border-rose-200;
+  }
+  .badge-myntra {
+    @apply badge bg-pink-50 text-pink-700 border border-pink-200;
+  }
+  .badge-nykaa {
+    @apply badge bg-fuchsia-50 text-fuchsia-700 border border-fuchsia-200;
+  }
+  .badge-success {
+    @apply badge bg-emerald-50 text-emerald-700 border border-emerald-200;
+  }
+  .badge-warning {
+    @apply badge bg-amber-50 text-amber-700 border border-amber-200;
+  }
+  .badge-danger {
+    @apply badge bg-rose-50 text-rose-700 border border-rose-200;
+  }
+  .badge-info {
+    @apply badge bg-indigo-50 text-indigo-700 border border-indigo-200;
+  }
+
+  /* Typography & Titles */
+  .section-title {
+    @apply text-2xl sm:text-3xl font-extrabold text-navy-900 tracking-tight;
+  }
+  .section-subtitle {
+    @apply text-sm text-gray-500 mt-1;
+  }
+  .gradient-text {
+    @apply bg-clip-text text-transparent bg-gradient-brand font-extrabold;
+  }
+}
+
+/* Shimmer Loading Skeleton */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s infinite;
+}
