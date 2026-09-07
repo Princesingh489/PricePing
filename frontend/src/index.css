@@ -156,3 +156,20 @@
   background-size: 200% 100%;
   animation: shimmer 1.6s infinite;
 }
+
+/* Suppress Netlify Injected Badge & Feedback Drawer */
+#netlify-badge,
+.netlify-badge,
+netlify-drawer-widget,
+[data-netlify-deploy-id],
+iframe[src*="netlify"],
+iframe[title*="Netlify"],
+div[class*="netlify-drawer"],
+div[class*="NetlifyBadge"],
+div:has(> a[href*="netlify.com"]) {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
