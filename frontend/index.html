@@ -10,6 +10,66 @@
     <meta property="og:title" content="PricePing – Smart Price Tracker & Comparison" />
     <meta property="og:description" content="Never pay full price again. Track prices and compare deals on all major Indian e-commerce platforms." />
     <meta name="theme-color" content="#4f46e5" />
+    <style>
+      /* Permanent Universal Netlify Badge & Drawer Eraser */
+      #netlify-badge,
+      .netlify-badge,
+      netlify-drawer-widget,
+      [data-netlify-deploy-id],
+      iframe[src*="netlify"],
+      iframe[id*="netlify"],
+      div[class*="netlify-drawer"],
+      div[class*="NetlifyBadge"],
+      a[href*="netlify.com"],
+      div:has(> a[href*="netlify.com"]) {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+        position: absolute !important;
+        left: -9999px !important;
+        width: 0 !important;
+        height: 0 !important;
+        clip: rect(0, 0, 0, 0) !important;
+        z-index: -9999 !important;
+      }
+    </style>
+    <script>
+      (function() {
+        function removeNetlifyBadge() {
+          const selectors = [
+            '#netlify-badge',
+            '.netlify-badge',
+            'netlify-drawer-widget',
+            '[data-netlify-deploy-id]',
+            'iframe[src*="netlify"]',
+            'iframe[id*="netlify"]',
+            'div[class*="netlify-drawer"]',
+            'div[class*="NetlifyBadge"]',
+            'a[href*="netlify.com"]'
+          ];
+          selectors.forEach(function(sel) {
+            document.querySelectorAll(sel).forEach(function(el) {
+              const container = el.closest('div') || el;
+              if (container) container.remove();
+            });
+          });
+          // Also detect any element containing 'Powered by Netlify' text
+          document.querySelectorAll('div, a, span').forEach(function(node) {
+            if (node.childNodes.length === 1 && node.textContent && node.textContent.includes('Powered by Netlify')) {
+              var parent = node.closest('div') || node;
+              parent.remove();
+            }
+          });
+        }
+        removeNetlifyBadge();
+        if (window.MutationObserver) {
+          new MutationObserver(removeNetlifyBadge).observe(document.documentElement, { childList: true, subtree: true });
+        }
+        window.addEventListener('DOMContentLoaded', removeNetlifyBadge);
+        window.addEventListener('load', removeNetlifyBadge);
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
