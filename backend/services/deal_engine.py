@@ -145,7 +145,7 @@ class DealEngine:
         # Sort pool by deal_score descending
         validated_pool.sort(key=lambda d: d.get("deal_score", 0), reverse=True)
 
-        # 2. Balanced 5-store selection
+        # 2. Balanced 5-store selection with dynamic time-based rotation
         by_store: Dict[str, List[Dict[str, Any]]] = {
             "amazon": [],
             "flipkart": [],
@@ -162,11 +162,25 @@ class DealEngine:
         selected_deals: List[Dict[str, Any]] = []
         chosen_ids = set()
 
-        # Phase A: Pick up to per_store_target for each store
+        # Dynamic time-slot rotation: rotates candidate selection every 2 minutes so deals change over time
+        now_ts = int(datetime.now(timezone.utc).timestamp())
+        time_slot = (now_ts // 120) % 12
+
+        # Phase A: Pick up to per_store_target for each store with time-based rotation
         for store_key in ["amazon", "flipkart", "myntra", "ajio", "nykaa"]:
             store_candidates = by_store[store_key]
+            if not store_candidates:
+                continue
+
+            n = len(store_candidates)
+            if n > per_store_target:
+                offset = time_slot % n
+                rotated = store_candidates[offset:] + store_candidates[:offset]
+            else:
+                rotated = store_candidates
+
             picked = 0
-            for deal in store_candidates:
+            for deal in rotated:
                 d_id = deal.get("id") or deal.get("deal_key") or deal.get("product_url")
                 if d_id not in chosen_ids and picked < per_store_target:
                     selected_deals.append(deal)

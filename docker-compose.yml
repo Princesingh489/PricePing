@@ -1,11 +1,20 @@
-version: '3.9'
+
+networks:
+  priceping_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
 
 services:
   # PostgreSQL Database
   db:
     image: postgres:16-alpine
-    container_name: pricewatch_db
+    container_name: priceping_db
     restart: unless-stopped
+    networks:
+      - priceping_network
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-pricewatch}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
@@ -20,11 +29,15 @@ services:
       timeout: 5s
       retries: 5
 
-  # Redis (Celery Broker)
+  # Redis (Cache & Celery Broker)
   redis:
     image: redis:7-alpine
-    container_name: pricewatch_redis
+    container_name: priceping_redis
     restart: unless-stopped
+    networks:
+      - priceping_network
+    volumes:
+      - redis_data:/data
     ports:
       - "6379:6379"
     healthcheck:
@@ -38,8 +51,12 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: pricewatch_backend
+    image: priceping-backend:latest
+    container_name: priceping_backend
     restart: unless-stopped
+    networks:
+      - priceping_network
+    shm_size: '1gb'
     env_file: .env
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-pricewatch}:${POSTGRES_PASSWORD:-password}@db:5432/${POSTGRES_DB:-pricewatch_db}
@@ -51,17 +68,24 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    volumes:
-      - ./backend:/app
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
 
-  # Celery Worker
+  # Celery Worker (Scraper Pipeline with Playwright)
   worker:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: pricewatch_worker
+    image: priceping-worker:latest
+    container_name: priceping_worker
     restart: unless-stopped
+    networks:
+      - priceping_network
+    shm_size: '1gb'
     env_file: .env
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-pricewatch}:${POSTGRES_PASSWORD:-password}@db:5432/${POSTGRES_DB:-pricewatch_db}
@@ -71,17 +95,20 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    volumes:
-      - ./backend:/app
+    healthcheck:
+      disable: true
     command: celery -A worker.celery_app worker --loglevel=info --concurrency=4
 
-  # Celery Beat (Scheduler)
+  # Celery Beat (Periodic Schedule Monitor)
   beat:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: pricewatch_beat
+    image: priceping-beat:latest
+    container_name: priceping_beat
     restart: unless-stopped
+    networks:
+      - priceping_network
     env_file: .env
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-pricewatch}:${POSTGRES_PASSWORD:-password}@db:5432/${POSTGRES_DB:-pricewatch_db}
@@ -91,17 +118,20 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    volumes:
-      - ./backend:/app
+    healthcheck:
+      disable: true
     command: celery -A worker.celery_app beat --loglevel=info
 
-  # Flower (Celery monitoring dashboard)
+  # Flower (Celery Monitoring Dashboard)
   flower:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: pricewatch_flower
+    image: priceping-flower:latest
+    container_name: priceping_flower
     restart: unless-stopped
+    networks:
+      - priceping_network
     environment:
       REDIS_URL: redis://redis:6379/0
     ports:
@@ -109,21 +139,30 @@ services:
     depends_on:
       - redis
       - worker
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5555/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
     command: celery -A worker.celery_app flower --port=5555 --address=0.0.0.0
 
-  # React Frontend (Production build via Nginx)
+  # React Frontend (Self-contained Nginx Production Build)
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: pricewatch_frontend
+    image: priceping-frontend:latest
+    container_name: priceping_frontend
     restart: unless-stopped
+    networks:
+      - priceping_network
     ports:
       - "80:80"
-    volumes:
-      - ./frontend/dist:/usr/share/nginx/html:ro
     depends_on:
       - backend
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
 
-volumes:
-  postgres_data:

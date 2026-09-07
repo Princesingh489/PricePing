@@ -244,8 +244,17 @@ export default function PricePingHeader({
             </button>
           </nav>
 
-          {/* Right Header Actions (Heart + Avatar) */}
-          <div className="flex items-center gap-3">
+          {/* Right Header Actions (Theme + Heart + Bell + Avatar) */}
+          <div className="flex items-center gap-2.5">
+            {/* Theme Customizer Button */}
+            <button
+              onClick={() => setThemeModalOpen(true)}
+              className="w-10 h-10 rounded-full bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 flex items-center justify-center transition-all shadow-xs cursor-pointer hover:scale-105"
+              title="Theme Customizer & Backdrops"
+            >
+              <Palette className="w-5 h-5 text-purple-600" />
+            </button>
+
             {/* Wishlist Heart button */}
             <Link
               to="/products"

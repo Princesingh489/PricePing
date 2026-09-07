@@ -56,8 +56,11 @@ export default function HeroTrackerSection({ onProductTracked }: Props) {
 
   return (
     <>
-      <section className="relative w-full overflow-hidden bg-[#24001d] text-white transition-all duration-500">
-        {/* Rich Festive Wallpaper Image Layer */}
+      <section
+        className="relative w-full overflow-hidden text-white transition-all duration-500"
+        style={{ backgroundColor: currentPreset.bgBase || '#121626' }}
+      >
+        {/* Rich Wallpaper Image or Theme Gradient Layer */}
         <div
           className="absolute inset-0 bg-cover bg-center transition-all duration-500"
           style={{
@@ -67,8 +70,13 @@ export default function HeroTrackerSection({ onProductTracked }: Props) {
           }}
         />
 
-        {/* Ambient Overlay to blend seamless text readability */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-[#300325]/50 to-[#22001c]/90 pointer-events-none" />
+        {/* Ambient Overlay dynamically matched to active theme preset */}
+        <div
+          className="absolute inset-0 pointer-events-none transition-all duration-500"
+          style={{
+            background: currentPreset.overlayGradient || 'linear-gradient(to bottom, rgba(0,0,0,0.35) 0%, rgba(15,23,42,0.5) 50%, rgba(10,13,24,0.95) 100%)',
+          }}
+        />
 
         {/* Hero Content Container */}
         <div className="relative z-10 px-4 py-12 sm:py-16 lg:py-20 max-w-5xl mx-auto text-center flex flex-col items-center">
@@ -118,15 +126,6 @@ export default function HeroTrackerSection({ onProductTracked }: Props) {
                   <X className="w-4 h-4" />
                 </button>
               )}
-
-              {/* Supported Platforms Bubbles inside search */}
-              <div className="hidden md:flex items-center gap-1.5 px-2 py-1 text-[11px] font-semibold text-gray-500 mr-2 flex-shrink-0">
-                <span>supports</span>
-                <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center text-[8px] font-black" title="Flipkart">FK</span>
-                <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center text-[8px] font-black" title="Amazon">AZ</span>
-                <span className="w-5 h-5 rounded-full bg-pink-100 text-pink-700 flex items-center justify-center text-[8px] font-black" title="Nykaa">NY</span>
-                <span className="w-5 h-5 rounded-full bg-purple-100 text-purple-800 flex items-center justify-center text-[8px] font-black" title="100+ Stores">99+</span>
-              </div>
 
               {/* Voice / Mic Icon */}
               <button

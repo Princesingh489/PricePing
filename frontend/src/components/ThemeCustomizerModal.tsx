@@ -27,7 +27,7 @@ export default function ThemeCustomizerModal({ isOpen, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
-      <div className="bg-[#121624] border border-white/15 rounded-3xl max-w-2xl w-full p-6 lg:p-8 relative shadow-2xl shadow-purple-500/20 max-h-[90vh] overflow-y-auto">
+      <div className="bg-[#121624] border border-white/15 rounded-3xl max-w-3xl w-full p-6 lg:p-8 relative shadow-2xl shadow-purple-500/20 max-h-[90vh] overflow-y-auto">
         {/* Close Button */}
         <button
           onClick={onClose}

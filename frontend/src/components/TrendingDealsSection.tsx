@@ -1,12 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { formatINR, PLATFORM_LABELS, getPlatformBadgeClass } from '../utils/helpers';
 import { useLanguage } from '../contexts/LanguageContext';
 import { productsApi, dealsApi } from '../services/api';
 import toast from 'react-hot-toast';
 import {
-  Bell, ExternalLink, Sparkles, Star, LineChart, RefreshCw
+  ExternalLink, Sparkles, Star, RefreshCw, Trash2, Loader2, RotateCcw
 } from 'lucide-react';
-import PriceHistoryCard from './PriceHistoryCard';
+import QuickTrackModal from './QuickTrackModal';
 import type { TrendingDeal, Platform } from '../types';
 
 interface Props {
@@ -22,14 +22,29 @@ const PLATFORMS_FILTER: { id: string; label: string }[] = [
   { id: 'nykaa', label: 'Nykaa' },
 ];
 
-export default function TrendingDealsSection({ onQuickTrack }: Props) {
+export default function TrendingDealsSection({ onQuickTrack: _onQuickTrack }: Props) {
   const { t } = useLanguage();
   const [selectedPlatform, setSelectedPlatform] = useState<string>('all');
-  const [selectedProductForChart, setSelectedProductForChart] = useState<any>(null);
   const [deals, setDeals] = useState<TrendingDeal[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [lastUpdated, setLastUpdated] = useState<string>('');
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+
+  // Modal State for opening product details like URL search
+  const [activeModalProduct, setActiveModalProduct] = useState<any>(null);
+  const [modalSearchedUrl, setModalSearchedUrl] = useState<string>('');
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [resolvingDealId, setResolvingDealId] = useState<string | null>(null);
+
+  // Persist dismissed/deleted deals in localStorage so they do not reappear
+  const [dismissedDealIds, setDismissedDealIds] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem('priceping_dismissed_deals');
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
 
   const fetchLiveDeals = useCallback(async (showLoadingSpinner: boolean = false) => {
     if (showLoadingSpinner) {
@@ -58,7 +73,7 @@ export default function TrendingDealsSection({ onQuickTrack }: Props) {
     fetchLiveDeals(true);
   }, [fetchLiveDeals]);
 
-  // Step 22: Automatic background refresh every 60 seconds
+  // Automatic background refresh every 60 seconds for dynamic rotating deals
   useEffect(() => {
     const interval = setInterval(() => {
       fetchLiveDeals(false);
@@ -73,22 +88,79 @@ export default function TrendingDealsSection({ onQuickTrack }: Props) {
       .catch(() => fetchLiveDeals(false));
   };
 
-  const handleTrackDeal = (deal: TrendingDeal) => {
-    if (onQuickTrack) {
-      onQuickTrack(deal.product_url);
-    } else {
-      productsApi.add({ product_url: deal.product_url })
-        .then(() => toast.success(`Now tracking price for ${deal.title.slice(0, 30)}...!`))
-        .catch(() => toast.success(`Tracking price for ${deal.title.slice(0, 30)}...`));
+  // Delete/dismiss a deal from user's view
+  const handleDeleteDeal = (dealId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDismissedDealIds((prev) => {
+      const next = new Set(prev);
+      next.add(dealId);
+      try {
+        localStorage.setItem('priceping_dismissed_deals', JSON.stringify(Array.from(next)));
+      } catch (err) {
+        console.warn('Could not persist dismissed deal to localStorage', err);
+      }
+      return next;
+    });
+    toast.success('Deal removed from trending', { icon: '🗑️' });
+  };
+
+  // Restore dismissed deals if needed
+  const handleRestoreDismissed = () => {
+    setDismissedDealIds(new Set());
+    localStorage.removeItem('priceping_dismissed_deals');
+    toast.success('Restored all deleted deals');
+  };
+
+  // Problem 1: Clicking Product or Title opens full comparison modal identical to URL search
+  const handleOpenProduct = async (deal: TrendingDeal) => {
+    setResolvingDealId(deal.id);
+    try {
+      const res = await productsApi.resolveUrl(deal.product_url);
+      setActiveModalProduct(res.data);
+      setModalSearchedUrl(deal.product_url);
+      setIsModalOpen(true);
+    } catch (err: any) {
+      console.warn('Direct resolve failed, fallback to structured product representation:', err);
+      // Fallback gracefully to product representation so the user always sees the product view
+      setActiveModalProduct({
+        product: {
+          id: deal.product_id ? parseInt(String(deal.product_id).replace(/\D/g, '')) || 1 : 1,
+          product_name: deal.title,
+          platform: deal.store,
+          product_url: deal.product_url,
+          current_price: deal.price,
+          original_price: deal.mrp,
+          discount_percentage: deal.discount_percent,
+          product_image: deal.image_url,
+          rating: deal.rating,
+          rating_count: deal.rating_count,
+          brand: deal.brand,
+          store: deal.store,
+          currency: 'INR',
+          availability: 'in_stock',
+          deal_score: deal.deal_score,
+        },
+        cross_store_offers: [],
+        canonical_product: null,
+        statistics: null,
+        history_points: [],
+      });
+      setModalSearchedUrl(deal.product_url);
+      setIsModalOpen(true);
+    } finally {
+      setResolvingDealId(null);
     }
   };
 
+  // Filter out deleted deals
+  const activeDeals = deals.filter((d) => !dismissedDealIds.has(d.id));
+
   const filteredDeals = selectedPlatform === 'all'
-    ? deals
-    : deals.filter((d) => (d.store || '').toLowerCase() === selectedPlatform.toLowerCase());
+    ? activeDeals
+    : activeDeals.filter((d) => (d.store || '').toLowerCase() === selectedPlatform.toLowerCase());
 
   // Store counts for filter badges
-  const storeCounts = deals.reduce((acc, deal) => {
+  const storeCounts = activeDeals.reduce((acc, deal) => {
     const s = (deal.store || '').toLowerCase();
     acc[s] = (acc[s] || 0) + 1;
     return acc;
@@ -118,20 +190,31 @@ export default function TrendingDealsSection({ onQuickTrack }: Props) {
               <RefreshCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin' : ''}`} />
               <span>{isRefreshing ? 'Checking...' : 'Refresh'}</span>
             </button>
+
+            {dismissedDealIds.size > 0 && (
+              <button
+                onClick={handleRestoreDismissed}
+                className="inline-flex items-center gap-1 text-[11px] font-bold text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 px-2 py-0.5 rounded-md transition-colors cursor-pointer"
+                title="Restore all deleted deals"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>Restore ({dismissedDealIds.size})</span>
+              </button>
+            )}
           </div>
 
           <h2 className="text-2xl sm:text-3xl font-black text-navy-900 tracking-tight">
             {t('trending_deals', 'Trending Deals Across Stores')}
           </h2>
           <p className="text-sm text-gray-500 mt-1">
-            Prices and availability are verified periodically across Amazon, Flipkart, Myntra, AJIO & Nykaa.
+            Prices and availability are verified periodically across Amazon, Flipkart, Myntra, AJIO & Nykaa. Click any product to view full price intelligence.
           </p>
         </div>
 
         {/* 5 E-Commerce Platform Filter Tabs */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-2 md:pb-0 scrollbar-none">
           {PLATFORMS_FILTER.map((plat) => {
-            const count = plat.id === 'all' ? deals.length : (storeCounts[plat.id] || 0);
+            const count = plat.id === 'all' ? activeDeals.length : (storeCounts[plat.id] || 0);
             const isSelected = selectedPlatform === plat.id;
 
             return (
@@ -159,7 +242,7 @@ export default function TrendingDealsSection({ onQuickTrack }: Props) {
       </div>
 
       {/* Loading Skeleton */}
-      {isLoading && deals.length === 0 ? (
+      {isLoading && activeDeals.length === 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 animate-pulse">
           {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
             <div key={n} className="card p-5 bg-white border border-gray-150 rounded-2xl h-80 flex flex-col justify-between">
@@ -171,26 +254,68 @@ export default function TrendingDealsSection({ onQuickTrack }: Props) {
             </div>
           ))}
         </div>
+      ) : filteredDeals.length === 0 ? (
+        /* Empty State */
+        <div className="text-center py-12 bg-white border border-dashed border-gray-200 rounded-3xl p-8">
+          <p className="text-base font-bold text-gray-700 mb-1">No deals currently visible in this view</p>
+          <p className="text-xs text-gray-400 mb-4">You may have deleted these deals or selected an empty store filter.</p>
+          {dismissedDealIds.size > 0 && (
+            <button
+              onClick={handleRestoreDismissed}
+              className="btn-secondary text-xs px-4 py-2 cursor-pointer font-bold inline-flex items-center gap-1.5"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Restore Deleted Deals</span>
+            </button>
+          )}
+        </div>
       ) : (
         /* Deals Grid */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
           {filteredDeals.map((deal) => {
             const storeKey = (deal.store || 'amazon').toLowerCase() as Platform;
             const platformInfo = PLATFORM_LABELS[storeKey] || { name: deal.store, badgeClass: 'bg-gray-100 text-gray-800' };
+            const isResolvingThis = resolvingDealId === deal.id;
 
             return (
               <div
                 key={deal.id}
-                className="card p-5 group hover:border-indigo-300 hover:shadow-card-hover transition-all duration-300 flex flex-col justify-between bg-white border border-gray-150 rounded-2xl"
+                onClick={() => handleOpenProduct(deal)}
+                className="card p-5 group hover:border-indigo-400 hover:shadow-card-hover hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between bg-white border border-gray-150 rounded-2xl cursor-pointer relative"
+                title="Click to view product comparison & price history"
               >
+                {/* Resolving Spinner Overlay */}
+                {isResolvingThis && (
+                  <div className="absolute inset-0 bg-white/85 backdrop-blur-xs z-30 rounded-2xl flex flex-col items-center justify-center gap-2">
+                    <Loader2 className="w-7 h-7 text-indigo-600 animate-spin" />
+                    <span className="text-xs font-bold text-gray-800">Opening Product...</span>
+                  </div>
+                )}
+
                 <div>
                   {/* Image and Badges */}
                   <div className="relative rounded-xl overflow-hidden mb-4 bg-gray-50 h-48 flex items-center justify-center border border-gray-100">
                     <img
                       src={deal.image_url}
                       alt={deal.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-500"
                       loading="lazy"
+                      referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        e.currentTarget.onerror = null;
+                        const cat = (deal.category || '').toLowerCase();
+                        if (cat.includes('audio') || cat.includes('headphone')) {
+                          e.currentTarget.src = 'https://m.media-amazon.com/images/I/61L4SkS7w2L._SX679_.jpg';
+                        } else if (cat.includes('footwear') || cat.includes('shoe') || cat.includes('slipper')) {
+                          e.currentTarget.src = 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=500&auto=format&fit=crop&q=80';
+                        } else if (cat.includes('smart') || cat.includes('phone')) {
+                          e.currentTarget.src = 'https://images.unsplash.com/photo-1592750475338-74b7b21085ab?w=500&auto=format&fit=crop&q=80';
+                        } else if (cat.includes('beauty')) {
+                          e.currentTarget.src = 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=500&auto=format&fit=crop&q=80';
+                        } else {
+                          e.currentTarget.src = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&auto=format&fit=crop&q=80';
+                        }
+                      }}
                     />
                     <div className="absolute top-2.5 left-2.5 flex items-center gap-1 flex-wrap">
                       <span className={getPlatformBadgeClass(storeKey) + ' badge shadow-md text-[10px] font-bold'}>
@@ -214,7 +339,10 @@ export default function TrendingDealsSection({ onQuickTrack }: Props) {
                   </div>
 
                   {/* Title */}
-                  <h3 className="font-bold text-navy-900 text-sm line-clamp-2 mb-2.5 group-hover:text-indigo-600 transition-colors" title={deal.title}>
+                  <h3
+                    className="font-bold text-navy-900 text-sm line-clamp-2 mb-2.5 group-hover:text-indigo-600 transition-colors"
+                    title={deal.title}
+                  >
                     {deal.title}
                   </h3>
 
@@ -253,46 +381,30 @@ export default function TrendingDealsSection({ onQuickTrack }: Props) {
                   </div>
                 </div>
 
-                {/* Action Buttons */}
+                {/* Action Buttons: Only 2 Buttons (Delete & Buy as requested) */}
                 <div className="flex items-center gap-2 pt-3 border-t border-gray-100 mt-2">
+                  {/* 1. Delete Button */}
                   <button
-                    onClick={() => handleTrackDeal(deal)}
-                    className="btn-primary flex-1 text-xs py-2 cursor-pointer font-bold flex items-center justify-center gap-1.5"
-                    title="Track Price Drop"
+                    type="button"
+                    onClick={(e) => handleDeleteDeal(deal.id, e)}
+                    className="inline-flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100/80 border border-rose-200/60 transition-all cursor-pointer flex-shrink-0"
+                    title="Delete deal from list"
                   >
-                    <Bell className="w-3.5 h-3.5" />
-                    <span>Track Price</span>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete</span>
                   </button>
 
-                  <button
-                    onClick={() =>
-                      setSelectedProductForChart({
-                        id: deal.product_id || deal.id,
-                        platform: storeKey,
-                        product_name: deal.title,
-                        product_url: deal.product_url,
-                        current_price: deal.price,
-                        original_price: deal.mrp,
-                        discount_percentage: deal.discount_percent,
-                        saved_amount: deal.saved_amount,
-                        availability: 'in_stock',
-                        created_at: deal.last_verified_at,
-                      })
-                    }
-                    className="btn-secondary text-xs p-2 cursor-pointer"
-                    title="View Price Trend Chart"
-                  >
-                    <LineChart className="w-4 h-4 text-indigo-600" />
-                  </button>
-
+                  {/* 2. Buy Button */}
                   <a
                     href={deal.product_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="btn-secondary text-xs p-2 text-gray-600 hover:text-navy-900 flex items-center justify-center"
+                    onClick={(e) => e.stopPropagation()}
+                    className="btn-primary flex-1 py-2 text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm hover:shadow transition-all"
                     title={`Buy on ${platformInfo.name}`}
                   >
-                    <ExternalLink className="w-4 h-4" />
+                    <span>Buy Now</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
                   </a>
                 </div>
               </div>
@@ -301,20 +413,13 @@ export default function TrendingDealsSection({ onQuickTrack }: Props) {
         </div>
       )}
 
-      {/* Chart Modal */}
-      {selectedProductForChart && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
-          <div className="bg-[#0b0f1a] border border-white/10 rounded-3xl max-w-4xl w-full p-6 relative max-h-[90vh] overflow-y-auto shadow-2xl">
-            <button
-              onClick={() => setSelectedProductForChart(null)}
-              className="absolute top-5 right-5 w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-gray-300 hover:text-white flex items-center justify-center transition-all z-10 cursor-pointer"
-            >
-              ✕
-            </button>
-            <PriceHistoryCard product={selectedProductForChart} />
-          </div>
-        </div>
-      )}
+      {/* QuickTrackModal for in-app product comparison & intelligence (same as URL input) */}
+      <QuickTrackModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        initialProduct={activeModalProduct}
+        searchedUrl={modalSearchedUrl}
+      />
     </section>
   );
 }
