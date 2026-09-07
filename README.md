@@ -11,6 +11,7 @@
 - [🧰 Tech Stack](#-tech-stack)
 - [🏗️ System Architecture](#️-system-architecture)
 - [📁 Project Structure](#-project-structure)
+- [🌐 Live Production Deployment (Netlify + AWS EC2)](#-live-production-deployment-netlify--aws-ec2)
 - [🚀 Quick Start (Docker — Recommended)](#-quick-start-docker--recommended)
 - [💻 Local Development Setup (Zero-Docker / SQLite)](#-local-development-setup-zero-docker--sqlite)
 - [🔐 Default Credentials](#-default-credentials)
@@ -19,6 +20,7 @@
 - [📈 Historical Price Intelligence & Deal Scoring](#-historical-price-intelligence--deal-scoring)
 - [📡 API Reference](#-api-reference)
 - [⚙️ Environment Variables Reference](#️-environment-variables-reference)
+- [📚 Extended Technical Documentation](#-extended-technical-documentation)
 - [🔍 Testing & Verification](#-testing--verification)
 - [🐛 Troubleshooting & FAQ](#-troubleshooting--faq)
 - [📄 License](#-license)
@@ -253,11 +255,45 @@ PricePing/
 │   ├── tailwind.config.js                # Tailwind CSS configuration
 │   └── Dockerfile                        # Multi-stage production Nginx container build
 │
-├── docker-compose.yml                    # Multi-container orchestration (7 services)
+├── docker-compose.yml                    # Multi-container orchestration (5 active services on AWS)
+├── netlify.toml                          # Netlify build, SPA routing & server-to-server AWS proxy
 ├── .env.example                          # Environment variable configuration template
-├── SCRAPERS.md                           # Deep-dive scraper architecture & validation rules
-└── README.md                             # Documentation
+├── DATA.md                               # Historical price engine, database schemas & math invariants
+├── SCRAPERS.md                           # Scraper architecture, anti-bot & 5-store adapters
+├── plan.md                               # Live cloud architecture & deployment runbook
+└── README.md                             # Main project documentation
 ```
+
+---
+
+## 🌐 Live Production Deployment (Netlify + AWS EC2)
+
+PricePing is deployed in a high-performance, cost-free ($0.00/mo) decoupled architecture:
+
+| Tier | Platform | Host / Target | Role |
+| :--- | :--- | :--- | :--- |
+| **Frontend** | **Netlify Global CDN** | `https://your-site.netlify.app` | React 19 SPA, global edge caching, SSL, continuous Git deployment |
+| **Backend API** | **AWS EC2 (Ubuntu 24.04)** | `http://65.0.199.91:8000` | FastAPI, Playwright scraping pool, Uvicorn ASGI server |
+| **Database** | **AWS Docker Container** | `pricewatch_db:5432` | PostgreSQL 16 Alpine persistent storage |
+| **Broker & Cache** | **AWS Docker Container** | `pricewatch_redis:6379` | Redis 7 in-memory cache & Celery queue |
+| **Async Workers** | **AWS Docker Container** | `pricewatch_worker` | Celery background scraper worker cluster |
+| **Scheduler** | **AWS Docker Container** | `pricewatch_beat` | Celery Beat periodic price polling (30m / 6h) |
+
+### 🔒 Server-to-Server Proxy Architecture
+Netlify securely proxies API requests to AWS EC2 via `netlify.toml`:
+```toml
+# Proxy /api requests directly to AWS EC2 backend (bypasses browser mixed-content blocks)
+[[redirects]]
+  from = "/api/*"
+  to = "http://65.0.199.91:8000/api/:splat"
+  status = 200
+  force = true
+```
+This guarantees **zero mixed-content warnings** (browser communicates exclusively over HTTPS) and **eliminates CORS restrictions**.
+
+### 🔍 Verification Endpoints
+- **Live AWS Health Check**: [http://65.0.199.91:8000/api/health](http://65.0.199.91:8000/api/health)
+- **Interactive Swagger Docs**: [http://65.0.199.91:8000/api/docs](http://65.0.199.91:8000/api/docs)
 
 ---
 
@@ -681,6 +717,16 @@ AMAZON_SECRET_KEY=""
 AMAZON_ASSOCIATE_TAG=""
 FLIPKART_AFFILIATE_TOKEN=""
 ```
+
+---
+
+## 📚 Extended Technical Documentation
+
+For in-depth architecture, mathematical specifications, and runbooks, refer to the dedicated documentation files:
+
+- 📊 **[DATA.md](file:///c:/Users/Prince/Desktop/PricePing/DATA.md)**: Comprehensive guide to database models (PostgreSQL & SQLite), 2-year Highcharts time-series parsing, Keepa integration, daily minimum downsampling, and percentile deal scoring invariants.
+- 🕷️ **[SCRAPERS.md](file:///c:/Users/Prince/Desktop/PricePing/SCRAPERS.md)**: Deep-dive scraper architecture across Amazon India, Flipkart, Myntra, AJIO, and Nykaa, 3-tier extraction pipeline, size variant synchronization (`sync_variant_price`), anti-bot stealth mechanisms, and cross-store comparison logic.
+- 🚀 **[plan.md](file:///c:/Users/Prince/Desktop/PricePing/plan.md)**: Complete production deployment blueprint, AWS EC2 cluster runbook, Netlify global proxy configuration, cost breakdown ($0.00/mo), and operational troubleshooting.
 
 ---
 

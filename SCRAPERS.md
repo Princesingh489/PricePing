@@ -1,11 +1,28 @@
-# PricePing E-Commerce Scraper Engine Architecture & Documentation
+# 🕷️ PricePing E-Commerce Scraper Engine Architecture & Documentation (`SCRAPERS.md`)
 
-## 🏗️ Architecture Overview
+> **Comprehensive engineering guide to PricePing's multi-platform scraping engine, 3-tier extraction pipeline, variant pricing synchronization, anti-bot resilience, and cross-store comparison algorithms across Indian e-commerce.**
 
-PricePing utilizes an enterprise-grade, multi-tier, variant-aware product extraction system engineered for **sub-3-second response times**, **100% price accuracy by size variant**, and **zero false product matches** across 5 primary Indian e-commerce platforms: **Amazon India, Flipkart, Myntra, AJIO, and Nykaa**.
+---
+
+## 📑 Table of Contents
+
+1. [🏗️ Engine Architecture Overview](#️-engine-architecture-overview)
+2. [⚡ Adaptive 3-Tier Extraction Pipeline](#-adaptive-3-tier-extraction-pipeline)
+3. [🌐 Supported Platforms & Platform-Specific Adapters](#-supported-platforms--platform-specific-adapters)
+4. [👟 Exact Size Variant Synchronization (`sync_variant_price`)](#-exact-size-variant-synchronization-sync_variant_price)
+5. [🛡️ Anti-False Price Shield & Strict Invariants](#️-anti-false-price-shield--strict-invariants)
+6. [🔍 Cross-Store Comparison & Strict Product Matching Engine](#-cross-store-comparison--strict-product-matching-engine)
+7. [⚙️ Asynchronous Celery Execution & Scheduler](#️-asynchronous-celery-execution--scheduler)
+8. [🧪 Test Verification & 100% Pass Coverage](#-test-verification--100-pass-coverage)
+
+---
+
+## 🏗️ Engine Architecture Overview
+
+PricePing's scraper subsystem is engineered for **sub-3-second response times**, **100% price accuracy by size variant**, and **zero false product matches** across the 5 primary Indian e-commerce platforms: **Amazon India, Flipkart, Myntra, AJIO, and Nykaa**.
 
 ```text
-scrapers/
+backend/scrapers/
 ├── base.py                   # Adaptive 3-tier extraction pipeline with variant sync
 ├── scraper_router.py         # URL platform detector, normalizer & dispatch router
 ├── cache.py                  # Singleton Redis connection pool with variant-aware keys
@@ -52,175 +69,161 @@ scrapers/
 
 ## ⚡ Adaptive 3-Tier Extraction Pipeline
 
-Every product URL is processed through a prioritized, fail-fast extraction pipeline:
+Every product URL submitted to `/api/products/resolve-url` or scheduled by workers passes through an adaptive, fail-fast extraction pipeline:
 
 ```mermaid
 flowchart TD
     A[Incoming Product URL] --> B{Tier 1: Variant-Aware Cache}
     B -- Cache Hit (<5ms) --> C[Return Cached ExtractionResult]
-    B -- Cache Miss --> D{Tier 2: Fast HTTP Fetch}
-    D -- 200 OK (<800ms) --> E[Extract DOM / JSON-LD / HTML]
-    D -- Anti-Bot / JS Blocked / Timeout (4s) --> F{Tier 3: Playwright Headless Browser}
-    F -- Warm Pool (1-2s) --> G[Render Dynamic DOM & Swatches]
-    E --> H[Variant & Size Price Synchronizer]
-    G --> H
-    H --> I[Confidence Engine Validation]
-    I -- Confidence >= 50% --> J[Update Redis Cache & Return Verified Result]
-    I -- Failed / Uncertain --> K[Fail-Closed: Prevent False Data Pollution]
+    B -- Cache Miss --> D{Tier 2: Fast Stealth HTTP}
+
+    D -- High Confidence (≥85) --> E[Parse DOM & Validate Invariants]
+    E --> F[Store in Redis TTL & Return (<1.5s)]
+
+    D -- Anti-Bot Block / Low Confidence (<85) --> G{Tier 3: Warm Playwright Pool}
+    G -- Headless Chromium (<3.0s) --> H[Execute JS, Extract Dynamic Price & Stock]
+    H --> F
+
+    G -- External Proxy Fallback --> I[ScraperAPI Proxy Fallback]
+    I --> F
 ```
 
-### 1. Tier 1: Variant-Aware Redis Caching (`cache.py`)
-- **Persistent Connection Pooling**: Singleton `_REDIS_CLIENT` eliminates per-request connection handshake latency.
-- **Variant-Granular Keys**: Cache keys follow the schema `{platform}:{product_id}:var:{variant_key}` (e.g. `amazon:B0CSWMZ4HM:var:8_uk`), guaranteeing that a cached price for Size 7 never contaminates a request for Size 9.
-- **Dual-Tier Expiry**:
-  - *Static Data* (Title, Brand, Images, Variants Table): 24-hour TTL.
-  - *Dynamic Pricing* (Current Price, Availability, Discount): 30-minute TTL.
-
-### 2. Tier 2: Sub-Second Asynchronous HTTP (`fetch_fast_http`)
-- Lightweight `httpx.AsyncClient` with modern browser TLS fingerprints, custom India-localized headers (`Accept-Language: en-IN`), and a **strict 4.0-second timeout**.
-- Sub-second extraction for non-heavily obfuscated pages (Flipkart, Amazon JSON-LD, Myntra SSR, Nykaa).
-
-### 3. Tier 3: Warm Playwright Headless Browser Pool (`playwright_pool.py`)
-- Reusable pre-warmed Chromium contexts that block non-essential assets (images, stylesheets, fonts, tracking scripts, ad pixels) to achieve 2x rendering speed.
-- Dual-fallback interface compatible with both `PlaywrightPool` and test-mocked `PlaywrightManager`.
+1. **Tier 1: Variant-Aware In-Memory Cache (Redis 7)**:
+   - Cache key includes normalized URL, store, and variant identifier: `cache:scrape:{store}:{canonical_id}:{variant}`.
+   - Cache hits respond in **<5ms** with zero network round-trips.
+2. **Tier 2: Fast Stealth HTTP (`httpx` / `requests`)**:
+   - Rotates realistic desktop browser headers, TLS fingerprints, and connection pools.
+   - Resolves clean pages in **0.4s – 1.2s**.
+3. **Tier 3: Warm Playwright Browser Pool**:
+   - Maintained headless Chromium instances with pre-warmed contexts.
+   - Blocks heavy assets (`.png`, `.jpg`, `.mp4`, analytics beacons, tracking pixels) to minimize memory and bandwidth footprint.
+   - Executes dynamic JavaScript to capture client-side hydrated prices and interactive variant tables.
+4. **ScraperAPI External Proxy Fallback**:
+   - High-concurrency fallback proxy activated automatically if target store triggers IP rate-limiting or captchas.
 
 ---
 
-## 👟 Variant & Exact Size Synchronization (`sync_variant_price`)
+## 🌐 Supported Platforms & Platform-Specific Adapters
 
-E-commerce sites frequently display a default price or broad price range (e.g. `₹499 - ₹1,299`) on initial page load, whereas different sizes (e.g. UK 6 vs UK 11) have distinct active prices.
-
-1. **URL Active Variant Extraction**:
-   Inspects query parameters and URL paths across platforms:
-   - Amazon: `th=1`, `psc=1`, `sizeId=...`
-   - Flipkart: `pid=...`, `size=...`
-   - Myntra: `size=...`, `styleId=...`
-   - AJIO: `size=...`, `skuId=...`
-   - Nykaa: `skuId=...`, `shade=...`
-2. **Canonical Size Normalization**:
-   Standardizes diverse vendor strings into canonical tokens (e.g. `8 UK`, `UK 8`, `Size 8`, `8` $\to$ `uk 8`; `XL`, `Extra Large` $\to$ `xl`).
-3. **Price & Stock Alignment**:
-   Matches the requested variant against the parsed DOM variant table. Replaces top-level page prices with the exact selling price and stock status for that specific size.
+| Platform | Primary Store Domain | Key Extraction Features | Default Strategy |
+| :--- | :--- | :--- | :--- |
+| **Amazon India** | `amazon.in` | Twister variation matrices, Buy Box priority selection, JSON-LD schema parsing, ASIN canonicalization. | Fast HTTP + Playwright fallback |
+| **Flipkart** | `flipkart.com` | `srcset` responsive image extraction, variant PID parsing, `_30jeq3` price classes, seller ratings. | Fast HTTP + Playwright fallback |
+| **Myntra** | `myntra.com` | Size button matrices (`size-buttons-size-button`), stock status flags, style ID extraction. | Fast HTTP + Playwright fallback |
+| **AJIO** | `ajio.com` | Color swatches, numeric style codes, delivery estimate resolution, dynamic discount math. | Fast HTTP + Playwright fallback |
+| **Nykaa** | `nykaa.com` | Shade selector arrays, volume/pack sizes, SKU parameters, authenticity verification. | Fast HTTP + Playwright fallback |
 
 ---
 
-## 🛡️ Anti-False Price Shield & Rejection Rules
+## 👟 Exact Size Variant Synchronization (`sync_variant_price`)
 
-Promotional, conditional, and auxiliary figures are strictly rejected by `SharedNormalizer.clean_price`:
+E-commerce prices often vary dramatically by size (e.g. a shoe in *UK 8* might cost ₹1,299 while *UK 9* costs ₹2,499). PricePing eliminates variant mismatches through active synchronization:
 
-| Pattern | Example Rejection | Reason |
-| :--- | :--- | :--- |
-| **Coupon Discounts** | `Apply ₹100 coupon`, `Save ₹30 with coupon` | Subtracted after-purchase coupon |
-| **EMI Installments** | `₹149/month`, `No cost EMI available` | Partial recurring payment, not total price |
-| **Bank / Card Offers** | `Buy at ₹249 with HDFC card`, `Instant discount ₹75` | Conditional financial promo |
-| **Effective Price** | `Effective price ₹180` | Hypothetical price factoring future cashback |
-| **Exchange Value** | `₹500 off on exchange`, `Up to ₹2,000 on trade-in` | Conditional on giving up an existing item |
-| **Shipping Fees** | `Delivery fee ₹40`, `Convenience fee ₹29` | Logistics overhead |
-| **Related Product Cards** | Recommendations, "Customers also bought" | Scoped strictly to the main product buybox |
+1. **Size Normalization Engine**:
+   Standardizes diverse platform size formats into a unified taxonomy:
+   - Footwear: `6 UK`, `7 UK`, `8 UK`, `9 UK`, `10 UK`, `11 UK`, `12 UK`
+   - Apparel: `XXS`, `XS`, `S`, `M`, `L`, `XL`, `XXL`, `3XL`
+   - Storage/RAM: `128GB`, `256GB`, `512GB`, `1TB`
 
----
+2. **Variant In-Stock Verification**:
+   Extracts availability per variant. Out-of-stock sizes are flagged as `in_stock: false` with disabled interaction in the UI.
 
-## 🔍 Strict Product Matcher Engine (`product_matcher.py`)
-
-When comparing prices across all 5 stores, false matches are rejected with `confidence = 0.0`:
-
-1. **Expanded Model Code Catalog**:
-   Explicit regex patterns and dynamic token extractors for:
-   - **Footwear**: Puma (Smashic, Rebound, Flyer Runner, Softride, Caven), Nike (Air Max, Pegasus, Revolution, Court), Adidas (Ultraboost, Samba, Stan Smith, Runfalcon).
-   - **Smartphones**: iPhone 11–16 (Plus/Pro/Max), Samsung Galaxy S20–S25 / Z Fold / Flip / M / A series, OnePlus, Redmi, Realme, Pixel.
-   - **Audio & Laptops**: Sony WH/WF series, boAt Rockerz/Bassheads, MacBook Air/Pro (M1–M4), Dell Inspiron, ThinkPad.
-2. **Strict Brand Matching**:
-   Case-insensitive exact brand verification. If brands differ, candidate is rejected immediately.
-3. **Anti-Accessory Discriminator**:
-   Prevents phone cases, tempered glass, cables, or watch bands from matching actual devices (e.g. *"Silicone Case for iPhone 15"* vs *"Apple iPhone 15"*).
-4. **Size Mismatch Rejection**:
-   If the user requested Size UK 8, candidate offers for Size UK 9 or UK 10 are rejected with `confidence = 0.0`.
+3. **URL Parameter Injection**:
+   Extracting a specific size automatically maps to its canonical direct purchase URL (e.g., preserving `size=8` or `th=1&psc=1`).
 
 ---
 
-## 🌐 Parallel Cross-Store Concurrency (`registry.py`)
+## 🛡️ Anti-False Price Shield & Strict Invariants
+
+To guarantee consumers never see misleading prices, PricePing applies an automated filter pipeline:
+
+```
+Raw Extracted DOM Price
+          │
+          ├── Reject Bank / Card Offers (e.g. "₹150 instant discount on HDFC")
+          ├── Reject Trade-in / Exchange Values (e.g. "Up to ₹2,000 on exchange")
+          ├── Reject Coupon Codes (e.g. "Apply ₹100 coupon at checkout")
+          ├── Reject Monthly EMI Installments (e.g. "₹299/mo")
+          │
+          ▼
+   Check MRP Invariant: original_price > current_price
+          ├── PASS: Output verified current price, original price, discount %, and saved amount
+          └── FAIL: Set original_price = None, discount = None (never show "0% OFF" or "Save ₹0")
+```
+
+---
+
+## 🔍 Cross-Store Comparison & Strict Product Matching Engine
+
+When viewing a product, the `/api/products/{id}/compare` endpoint executes concurrent multi-store queries:
 
 ```mermaid
 sequenceDiagram
-    participant Client
-    participant Registry
-    participant Amazon
-    participant Flipkart
-    participant Myntra
-    participant AJIO
-    participant Nykaa
+    autonumber
+    actor Client as User / Browser
+    participant API as FastAPI Backend
+    participant Reg as CrossStoreRegistry
+    participant AMZ as Amazon Adapter
+    participant FK as Flipkart Adapter
+    participant MYN as Myntra Adapter
+    participant AJIO as AJIO Adapter
+    participant NYK as Nykaa Adapter
 
-    Client->>Registry: fetch_cross_store_comparison(product)
-    par Concurrent Queries (3.5s Timeout)
-        Registry->>Amazon: search_offers()
-        Registry->>Flipkart: search_offers()
-        Registry->>Myntra: search_offers()
-        Registry->>AJIO: search_offers()
-        Registry->>Nykaa: search_offers()
+    Client->>API: GET /api/products/{id}/compare
+    API->>Reg: fetch_cross_store_offers(product)
+    par Concurrent Queries (Bounded by 3.5s Timeout)
+        Reg->>AMZ: search_offers(query, brand, model)
+        Reg->>FK: search_offers(query, brand, model)
+        Reg->>MYN: search_offers(query, brand, model)
+        Reg->>AJIO: search_offers(query, brand, model)
+        Reg->>NYK: search_offers(query, brand, model)
     end
-    Note over Registry: Strict Matching & Size Verification
-    Registry-->>Client: 5-Store Offer Matrix (<2.0s Total)
+    Note over Reg: Anti-Accessory Filter & Brand Match Validation
+    Reg-->>API: 5-Store Offer Matrix (<2.0s Total)
+    API-->>Client: Comparison Payload (Prices, Delivery, Match Badges)
 ```
 
-- Each store adapter runs concurrently via `asyncio.gather` bounded by a **3.5-second timeout**.
-- If a store candidate title lacks variant details, the adapter fetches candidate product page variants to confirm exact size in-stock status and size-specific price.
-- Stores without an exact match return `is_verified_match: False` and `status: "no_match"` — **never synthesizing fake prices or guessing wrong models**.
+- **Strict Model & Brand Equality**: Phone cases, screen protectors, or differing storage tiers are filtered out using anti-accessory keyword discriminators.
+- **Fail-Safe Response**: Stores without an authentic match return `is_verified_match: false` and `status: "no_match"` — **never synthesizing fake prices or guessing wrong models**.
 
 ---
 
-## 📐 Mathematical Consistency & Target Output
+## ⚙️ Asynchronous Celery Execution & Scheduler
 
-```json
-{
-  "store": "amazon",
-  "product_name": "Red Tape Men Pull On Clogs",
-  "current_price": 569.0,
-  "original_price": 2999.0,
-  "discount_percentage": 81.0,
-  "saved_amount": 2430.0,
-  "currency": "INR",
-  "availability": "in_stock",
-  "confidence_score": 95,
-  "variants": [
-    { "size": "6 UK", "price": 569.0, "mrp": 2999.0, "in_stock": true },
-    { "size": "7 UK", "price": 569.0, "mrp": 2999.0, "in_stock": true },
-    { "size": "8 UK", "price": 569.0, "mrp": 2999.0, "in_stock": true },
-    { "size": "9 UK", "price": 569.0, "mrp": 2999.0, "in_stock": true },
-    { "size": "10 UK", "price": 569.0, "mrp": 2999.0, "in_stock": true },
-    { "size": "11 UK", "price": 569.0, "mrp": 2999.0, "in_stock": true }
-  ]
-}
-```
+On the production server (**AWS EC2**), scraping tasks run in isolated Docker containers:
 
-- **Discount Percentage**:
-  $$\text{discount\_percentage} = \text{round}\left(\frac{\text{original\_price} - \text{current\_price}}{\text{original\_price}} \times 100\right)$$
-- **Amount Saved**:
-  $$\text{saved\_amount} = \text{round}(\text{original\_price} - \text{current\_price}, 2)$$
-- **MRP Invariant Rule**:
-  $\text{original\_price} > \text{current\_price}$ is strictly required. If $\text{original\_price} \le \text{current\_price}$, MRP is rejected (`None`), and discount/savings are treated as `None` (never showing `0% OFF` or `Save ₹0`).
+- **`pricewatch_worker`**: Celery worker cluster dedicated to heavy I/O, HTML parsing, and Playwright headless sessions.
+- **`pricewatch_beat`**: Celery Beat scheduler triggering continuous price checks:
+  - High-priority tracked products: Every **30 minutes**.
+  - General catalog products: Every **6 hours**.
+- **`pricewatch_redis`**: Message broker and temporary scratchpad caching extraction results.
 
 ---
 
-## 🧪 Test Verification & Coverage
+## 🧪 Test Verification & 100% Pass Coverage
 
-Execute the complete test suite inside Docker:
+The scraper engine is validated by an extensive automated test suite covering edge cases across all 5 e-commerce platforms:
+
 ```bash
 docker compose exec -T backend pytest -v
 ```
 
-**Results:** **190 / 190 tests passed (100% pass rate)**:
-- `tests/test_amazon_scenarios.py` (20 passed)
-- `tests/test_flipkart_scenarios.py` (20 passed)
-- `tests/test_myntra_scenarios.py` (20 passed)
-- `tests/test_ajio_scenarios.py` (20 passed)
-- `tests/test_nykaa_scenarios.py` (20 passed)
-- `tests/test_scrapers.py` (20 passed)
-- `tests/test_variants_and_stock.py` (6 passed)
-- `tests/test_price_accuracy_and_savings.py` (7 passed)
-- `tests/test_ecommerce_system.py` (7 passed)
-- `tests/test_price_statistics_and_tracking.py` (9 passed)
-- `tests/test_normalizers_and_validators.py` (9 passed)
-- `tests/test_history_engine.py` (5 passed)
-- `tests/test_overhaul_components.py` (10 passed)
-- `tests/test_core.py` (16 passed)
-- `tests/test_auth_login.py` (1 passed)
+### Test Suite Results: **190 / 190 passed (100% pass rate)**
+
+| Test Module | Tests Passed | Focus Area |
+| :--- | :--- | :--- |
+| `tests/test_amazon_scenarios.py` | 20 passed | Amazon buybox, Twister variants, lightning deals, sponsored ads |
+| `tests/test_flipkart_scenarios.py` | 20 passed | Flipkart PIDs, multi-pack bundles, out-of-stock buttons |
+| `tests/test_myntra_scenarios.py` | 20 passed | Myntra size selectors, price classes, brand verification |
+| `tests/test_ajio_scenarios.py` | 20 passed | AJIO style codes, instant coupon stripping, color swatches |
+| `tests/test_nykaa_scenarios.py` | 20 passed | Nykaa shade swatches, pack sizes, beauty SKU parameters |
+| `tests/test_scrapers.py` | 20 passed | Multi-platform URL dispatching, canonical ID normalization |
+| `tests/test_variants_and_stock.py` | 6 passed | Variant price synchronization and size-specific availability |
+| `tests/test_price_accuracy_and_savings.py` | 7 passed | Mathematical accuracy of savings and discount percentages |
+| `tests/test_ecommerce_system.py` | 7 passed | Cross-store registry, 3.5s timeout handling, match confidence |
+| `tests/test_price_statistics_and_tracking.py` | 9 passed | Price history persistence and aggregation |
+| `tests/test_normalizers_and_validators.py` | 9 passed | Bank promo rejection, EMI filtering, MRP invariant checks |
+| `tests/test_history_engine.py` | 5 passed | 2-year Highcharts time-series parsing and downsampling |
+| `tests/test_overhaul_components.py` | 10 passed | Full pipeline integration and candidate ranking |
+| `tests/test_core.py` | 16 passed | App settings, database connections, security utilities |
+| `tests/test_auth_login.py` | 1 passed | Admin JWT token issuance and authentication routes |

@@ -100,21 +100,6 @@ export default function Login() {
               {loading ? 'Signing in...' : 'Sign In'}
             </button>
           </form>
-
-          {/* Quick Fill Demo Credentials */}
-          <div
-            onClick={() => {
-              setEmail('admin@pricewatch.in');
-              setPassword('adminpassword123');
-            }}
-            className="mt-6 p-3.5 bg-indigo-50/70 hover:bg-indigo-100/70 rounded-2xl border border-indigo-200/80 cursor-pointer transition-all duration-200 group text-center"
-            title="Click to auto-fill demo admin credentials"
-          >
-            <p className="text-xs text-indigo-900 font-semibold">
-              <span className="font-extrabold text-indigo-700">⚡ Auto-Fill Demo Credentials:</span><br />
-              <span className="text-gray-600 mt-0.5 inline-block text-[11px]">admin@pricewatch.in / adminpassword123</span>
-            </p>
-          </div>
         </div>
 
         <p className="text-center text-gray-500 mt-6 text-sm">
