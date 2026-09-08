@@ -8,6 +8,7 @@ import Layout from './components/Layout';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import ForgotPassword from './pages/ForgotPassword';
 import Dashboard from './pages/Dashboard';
 import MyProducts from './pages/MyProducts';
 import AddProduct from './pages/AddProduct';
@@ -46,6 +47,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <Login />} />
       <Route path="/register" element={user ? <Navigate to="/dashboard" /> : <Register />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
 
       {/* Main Home / Landing Route */}
       <Route

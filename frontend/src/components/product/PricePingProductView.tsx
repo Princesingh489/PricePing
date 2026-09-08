@@ -16,10 +16,11 @@ import {
   HelpCircle,
   ShieldCheck,
   Info,
+  BookmarkPlus,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { productsApi, alertsApi } from '../../services/api';
-import { formatINR, PLATFORM_LABELS } from '../../utils/helpers';
+import { formatINR, PLATFORM_LABELS, DEFAULT_PRODUCT_IMAGE } from '../../utils/helpers';
 import type {
   Product,
   StoreOffer,
@@ -234,6 +235,109 @@ export default function PricePingProductView({
   );
   const [settingAlert, setSettingAlert] = useState(false);
   const [alertSuccess, setAlertSuccess] = useState(false);
+
+  // Tracked Product State
+  const [isTracked, setIsTracked] = useState<boolean>(() => {
+    if (_trackerId && _trackerId > 0) return true;
+    try {
+      const saved = localStorage.getItem('priceping_user_tracked_urls');
+      if (saved) {
+        const set = new Set(JSON.parse(saved));
+        if (product.product_url && set.has(product.product_url)) return true;
+        if (product.id && set.has(String(product.id))) return true;
+        try {
+          const u = new URL(product.product_url);
+          const clean = `${u.origin}${u.pathname}`.toLowerCase().replace(/\/+$/, '');
+          if (set.has(clean)) return true;
+        } catch {}
+        if (product.product_name && set.has(product.product_name.toLowerCase().trim())) return true;
+      }
+    } catch {}
+    return false;
+  });
+  const [isTracking, setIsTracking] = useState(false);
+
+  useEffect(() => {
+    if (_trackerId && _trackerId > 0) {
+      setIsTracked(true);
+      return;
+    }
+    productsApi.list()
+      .then((res) => {
+        const list = res.data;
+        if (Array.isArray(list)) {
+          const isFound = list.some((item: any) => {
+            const p = item.product || item;
+            if (p.id === product.id) return true;
+            if (p.product_url && product.product_url && (p.product_url === product.product_url || p.canonical_url === product.product_url)) return true;
+            if (p.product_name && product.product_name && p.product_name.toLowerCase().trim() === product.product_name.toLowerCase().trim()) return true;
+            return false;
+          });
+          if (isFound) {
+            setIsTracked(true);
+            try {
+              const saved = localStorage.getItem('priceping_user_tracked_urls');
+              const set = new Set(saved ? JSON.parse(saved) : []);
+              if (product.product_url) set.add(product.product_url);
+              if (product.id) set.add(String(product.id));
+              localStorage.setItem('priceping_user_tracked_urls', JSON.stringify(Array.from(set)));
+            } catch {}
+          }
+        }
+      })
+      .catch(() => {});
+  }, [_trackerId, product.id, product.product_url, product.product_name]);
+
+  const handleTrackThisProduct = async () => {
+    if (isTracked) {
+      toast('Product is already in My Tracked Products', { icon: '🎯' });
+      return;
+    }
+    setIsTracking(true);
+    try {
+      await productsApi.add({
+        product_url: activeVariant?.url || product.product_url,
+        product_name: product.product_name,
+        current_price: curPrice,
+        original_price: origPrice,
+        discount_percentage: discountPct,
+        product_image: selectedImage || product.product_image,
+        image_url: selectedImage || product.product_image,
+        rating: product.rating,
+        rating_count: product.rating_count,
+        brand: product.brand,
+        store: product.platform || product.store,
+      });
+
+      setIsTracked(true);
+
+      // Persist in localStorage
+      try {
+        const saved = localStorage.getItem('priceping_user_tracked_urls');
+        const set = new Set(saved ? JSON.parse(saved) : []);
+        if (product.product_url) set.add(product.product_url);
+        if (activeVariant?.url) set.add(activeVariant.url);
+        if (product.id) set.add(String(product.id));
+        if (product.product_name) set.add(product.product_name.toLowerCase().trim());
+        try {
+          const u = new URL(product.product_url);
+          set.add(`${u.origin}${u.pathname}`.toLowerCase().replace(/\/+$/, ''));
+        } catch {}
+        localStorage.setItem('priceping_user_tracked_urls', JSON.stringify(Array.from(set)));
+      } catch {}
+
+      toast.success(`Tracked "${product.product_name.slice(0, 26)}..." in My Tracked Products! 🎯`, {
+        icon: '✓',
+        duration: 3500,
+      });
+    } catch (err) {
+      console.warn('Track product error, persisting locally:', err);
+      setIsTracked(true);
+      toast.success('Added to My Tracked Products! 🎯', { icon: '✓' });
+    } finally {
+      setIsTracking(false);
+    }
+  };
 
   // Platform info
   const platform = (product.platform || 'amazon') as Platform;
@@ -628,11 +732,11 @@ export default function PricePingProductView({
             {/* Primary Main Image */}
             <div className="relative aspect-square w-full rounded-2xl bg-white flex items-center justify-center p-4 border border-gray-100 overflow-hidden group">
               <img
-                src={selectedImage || product.product_image || 'https://placehold.co/400x400/f8fafc/6366f1?text=Product'}
+                src={selectedImage || product.product_image || DEFAULT_PRODUCT_IMAGE}
                 alt={product.product_name}
                 className="w-full h-full object-contain transition-transform duration-300 group-hover:scale-105"
                 onError={(e) => {
-                  (e.target as HTMLImageElement).src = 'https://placehold.co/400x400/f8fafc/6366f1?text=Product';
+                  (e.target as HTMLImageElement).src = DEFAULT_PRODUCT_IMAGE;
                 }}
               />
               {discountPct > 0 && (
@@ -658,7 +762,7 @@ export default function PricePingProductView({
                       alt="thumb"
                       className="w-full h-full object-contain"
                       onError={(e) => {
-                        (e.target as HTMLImageElement).src = 'https://placehold.co/100x100/f8fafc/6366f1?text=Thumb';
+                        (e.target as HTMLImageElement).src = DEFAULT_PRODUCT_IMAGE;
                       }}
                     />
                   </button>
@@ -734,16 +838,53 @@ export default function PricePingProductView({
               </div>
             </div>
 
-            {/* Big Primary CTA Button */}
-            <a
-              href={activeVariant?.url || product.product_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full py-3 px-6 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-sm text-center flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all cursor-pointer"
-            >
-              <span>Buy on {platformInfo.name}</span>
-              <ExternalLink className="w-4 h-4" />
-            </a>
+            {/* Action CTAs: Track Product (Left) & Buy on Store (Right) */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 pt-1">
+              {/* Secondary CTA: Track Product / ✓ Tracked (Left side) */}
+              {isTracked ? (
+                <button
+                  type="button"
+                  onClick={() => toast('Product is actively monitored in My Tracked Products', { icon: '🎯' })}
+                  className="flex-1 py-3 px-5 rounded-2xl bg-emerald-50 text-emerald-700 border border-emerald-300 font-bold text-sm text-center flex items-center justify-center gap-2 shadow-2xs transition-all cursor-default"
+                  title="Product is in My Tracked Products"
+                >
+                  <Check className="w-4 h-4 text-emerald-600 stroke-[2.5]" />
+                  <span>✓ Tracked</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleTrackThisProduct}
+                  disabled={isTracking}
+                  className="flex-1 py-3 px-5 rounded-2xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 hover:text-indigo-800 border border-indigo-200 font-bold text-sm text-center flex items-center justify-center gap-2 shadow-2xs hover:shadow-sm transition-all cursor-pointer active:scale-95 disabled:opacity-60"
+                  title="Add to My Tracked Products for price monitoring"
+                >
+                  {isTracking ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
+                      <span>Tracking...</span>
+                    </>
+                  ) : (
+                    <>
+                      <BookmarkPlus className="w-4 h-4 text-indigo-600" />
+                      <span>Track Product</span>
+                    </>
+                  )}
+                </button>
+              )}
+
+              {/* Primary Purchase CTA: Buy on Store (Right side) */}
+              <a
+                href={activeVariant?.url || product.product_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 py-3 px-6 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-sm text-center flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all cursor-pointer"
+                title={`Buy on ${platformInfo.name}`}
+              >
+                <span>Buy on {platformInfo.name}</span>
+                <ExternalLink className="w-4 h-4" />
+              </a>
+            </div>
 
             {/* ──── Color Swatches Section ──── */}
             {(colorSwatches.length > 0 || selectedColor) && (

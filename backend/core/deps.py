@@ -5,7 +5,7 @@ from core.security import decode_token
 from db.database import get_db
 from db import models
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
 
 
 def get_current_user(
@@ -16,9 +16,13 @@ def get_current_user(
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    if not token:
+        raise credentials_exception
+
     payload = decode_token(token)
     if payload is None:
         raise credentials_exception
+
     sub_val = payload.get("sub")
     if sub_val is None:
         raise credentials_exception

@@ -39,14 +39,33 @@ export const authApi = {
   getMe: () => api.get('/api/auth/me'),
   updateMe: (data: Partial<{ name: string; phone_number: string; email_notifications: boolean; push_notifications: boolean; sms_notifications: boolean }>) =>
     api.put('/api/auth/me', data),
+  // BUG-001 FIX: Send passwords as JSON body, NOT as URL query parameters.
+  // Query params are logged by web servers, proxies, and browser history.
   changePassword: (old_password: string, new_password: string) =>
-    api.post(`/api/auth/change-password?old_password=${old_password}&new_password=${new_password}`),
+    api.post('/api/auth/change-password', { old_password, new_password }),
+  forgotPassword: (email: string) =>
+    api.post('/api/auth/forgot-password', { email }),
 };
 
 // ---- Products ----
 export const productsApi = {
-  add: (data: { product_url: string; target_min_price?: number; target_max_price?: number }) =>
-    api.post('/api/products', data),
+  add: (data: {
+    product_url: string;
+    url?: string;
+    product_name?: string;
+    current_price?: number;
+    original_price?: number | null;
+    discount_percentage?: number | null;
+    product_image?: string | null;
+    image_url?: string | null;
+    rating?: number | null;
+    rating_count?: number | null;
+    brand?: string | null;
+    store?: string | null;
+    target_price?: number | null;
+    target_min_price?: number | null;
+    target_max_price?: number | null;
+  }) => api.post('/api/products', data),
   resolveUrl: (product_url: string) =>
     api.post('/api/products/resolve-url', { product_url }),
   list: (params?: { platform?: string; search?: string; status_filter?: string }) =>
@@ -86,6 +105,8 @@ export const alertsApi = {
   list: () => api.get('/api/alerts'),
   update: (id: number, data: object) => api.put(`/api/alerts/${id}`, data),
   delete: (id: number) => api.delete(`/api/alerts/${id}`),
+  setForProduct: (productId: number, data: object) => api.post(`/api/products/${productId}/alert`, data),
+  deleteForProduct: (productId: number) => api.delete(`/api/products/${productId}/alert`),
 };
 
 // ---- Notifications ----
@@ -109,7 +130,7 @@ export const adminApi = {
 
 // ---- Trending Deals ----
 export const dealsApi = {
-  getTrending: (params?: { store?: string; category?: string }) =>
+  getTrending: (params?: { store?: string; category?: string; refresh?: boolean }) =>
     api.get('/api/trending-deals', { params }),
   refresh: () =>
     api.post('/api/trending-deals/refresh'),

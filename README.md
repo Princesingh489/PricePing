@@ -50,11 +50,17 @@
   - Rejects coupons requiring checkout codes (e.g. *Apply ₹50 coupon*).
   - Rejects EMI monthly breakdown calculations (e.g. *₹299/mo*).
   - Enforces strict MRP validation ($\text{MRP} > \text{Current Price}$).
-- 🔔 **Intelligent Price Alerts & Multi-Channel Notifications**:
-  - **Below Price Target**: Trigger when price drops below a designated threshold (₹).
-  - **Price Range Target**: Trigger when price enters a specific target band.
-  - **Percentage Drop**: Trigger on an X% price reduction from tracking initiation.
+- 🔔 **Intelligent Price Alerts & High-Density Telemetry (`/alerts`)**:
+  - **Metric Telemetry Cards**: Instant visual breakdown of Total Alerts, Active Rules, Triggered Notifications, and Inactive items.
+  - **Threshold Rules**: Configure Below Price Target (₹), Price Range Bands, or Percentage Drop (%) triggers.
+  - **Progress Visualizer**: Color-coded progress bars displaying real-time distance to target price ($\Delta\%$).
+  - **Contextual 3-Dot Actions**: Instant inline Pause/Resume, Threshold Reconfiguration, and Safe Delete confirmation modal.
   - Delivery via in-app notification center, SMTP email, or optional Twilio SMS/voice calls.
+- 🔐 **Production-Grade SaaS Authentication (`/login`, `/forgot-password`)**:
+  - **10/10 SaaS Visual Identity**: Ambient centered purple glow over clean `#F8F9FC` background with subtle micro-interactions.
+  - **Google SSO Integration**: Prominent single-click Google sign-in alongside secure email/password credential auth.
+  - **Self-Service Password Recovery**: Complete `/forgot-password` flow directly hooked into `/api/auth/forgot-password`.
+  - **Zero Synthetic Stubs**: Completely authentic UX with no non-functional passkey mock buttons or fake states.
 - 💰 **SpendLens & Savings Intelligence**: Live analytics displaying total saved amount across tracked purchases, monitored budget, and highest-discount items.
 - 🎨 **Multi-Theme Engine**: 6 stunning visual presets including Festive Royal Gold & Plum, Cyber Neon, Crimson, Emerald, Cosmic, and Custom theme with adjustable brightness and ornaments.
 - 🌐 **10 Indian Languages Localization**: Full UI localization across English, Hindi (हिन्दी), Bengali (বাংলা), Telugu (తెలుగు), Tamil (தமிழ்), Marathi (मराठी), Gujarati (ગુજરાતી), Kannada (ಕನ್ನಡ), Malayalam (മലയാളം), and Punjabi (ਪੰਜਾਬੀ).
@@ -239,11 +245,12 @@ PricePing/
 │   │   │   ├── MyProducts.tsx            # Tracked products table, pause/resume, refresh, remove
 │   │   │   ├── ProductDetailPage.tsx     # Deep product inspection page with cross-store offers
 │   │   │   ├── AddProduct.tsx            # Wizard for tracking a new URL & setting thresholds
-│   │   │   ├── Alerts.tsx                # Active alert rules manager
+│   │   │   ├── Alerts.tsx                # High-density alert rules manager & live telemetry
 │   │   │   ├── Notifications.tsx         # In-app notifications center
 │   │   │   ├── Settings.tsx              # Account settings, notification channels, password reset
 │   │   │   ├── AdminPanel.tsx            # Admin telemetry & user administration
-│   │   │   ├── Login.tsx                 # User login page
+│   │   │   ├── Login.tsx                 # 10/10 SaaS login page with Google OAuth & ambient glow
+│   │   │   ├── ForgotPassword.tsx        # Self-service password reset & recovery workflow
 │   │   │   └── Register.tsx              # User registration page
 │   │   ├── services/
 │   │   │   └── api.ts                    # Axios client with JWT auto-injection & error handling
@@ -556,7 +563,7 @@ $$\text{Percentile} = \frac{\text{Count}(P_i \le P_{\text{current}})}{N} \times 
 | **WAIT** | $P_{\text{current}} > 35\text{th percentile}$ OR $P_{\text{current}} \ge \text{MRP}$ | 🔴 Red Badge | Near average or peak price; wait for upcoming sale |
 | **INSUFFICIENT DATA**| $N < 1$ verified historical recordings | ⚪ Gray Badge | Insufficient data; displays clean dashes (`—`) |
 
-For comprehensive database schemas, Keepa timestamp formulas, downsampling algorithms, and REST API contracts, see [HISTORICAL_DATA.md](file:///c:/Users/Prince/Desktop/PricePing/HISTORICAL_DATA.md).
+For comprehensive database schemas, Keepa timestamp formulas, downsampling algorithms, and REST API contracts, see [DATA.md](file:///c:/Users/Prince/Desktop/PricePing/DATA.md).
 
 ---
 

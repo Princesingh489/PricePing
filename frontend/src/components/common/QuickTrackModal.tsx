@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { productsApi, alertsApi } from '../../services/api';
 import toast from 'react-hot-toast';
-import { formatINR, PLATFORM_LABELS, getPlatformBadgeClass } from '../../utils/helpers';
+import { formatINR, PLATFORM_LABELS, getPlatformBadgeClass, DEFAULT_PRODUCT_IMAGE } from '../../utils/helpers';
 import type { TrackedProduct, Product } from '../../types';
 import {
   X, Sparkles, Bell, CheckCircle2, Star, Loader2
@@ -122,11 +122,11 @@ export default function QuickTrackModal({
             <div className="p-4 sm:p-5 rounded-2xl bg-gray-50/80 border border-gray-200 flex flex-col sm:flex-row gap-4 sm:gap-5 items-start sm:items-center">
               <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-white border border-gray-200 flex items-center justify-center p-2 flex-shrink-0 shadow-2xs overflow-hidden">
                 <img
-                  src={product.product_image || 'https://placehold.co/120x120/f8fafc/6366f1?text=Product'}
+                  src={product.product_image || DEFAULT_PRODUCT_IMAGE}
                   alt={product.product_name}
                   className="w-full h-full object-contain"
                   onError={(e) => {
-                    (e.target as HTMLImageElement).src = 'https://placehold.co/120x120/f8fafc/6366f1?text=Product';
+                    (e.target as HTMLImageElement).src = DEFAULT_PRODUCT_IMAGE;
                   }}
                 />
               </div>

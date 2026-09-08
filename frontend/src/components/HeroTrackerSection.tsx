@@ -20,7 +20,7 @@ export default function HeroTrackerSection({ onProductTracked }: Props) {
   const [activeModalProduct, setActiveModalProduct] = useState<any>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
-  const currentPreset = THEME_PRESETS[settings.heroTheme] || THEME_PRESETS.festive;
+  const currentPreset = THEME_PRESETS[settings.heroTheme] || THEME_PRESETS.cyber;
 
   // Background style computation
   const bannerImage = settings.heroTheme === 'custom' && settings.customImageUrl
@@ -63,11 +63,19 @@ export default function HeroTrackerSection({ onProductTracked }: Props) {
         {/* Rich Wallpaper Image or Theme Gradient Layer */}
         <div
           className="absolute inset-0 bg-cover bg-center transition-all duration-500"
-          style={{
-            backgroundImage: bannerImage ? `url(${bannerImage})` : undefined,
-            background: !bannerImage ? currentPreset.gradient : undefined,
-            filter: `brightness(${settings.bannerBrightness}%)`,
-          }}
+          style={
+            bannerImage
+              ? {
+                  backgroundImage: `url("${bannerImage}")`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                  filter: `brightness(${settings.bannerBrightness}%)`,
+                }
+              : {
+                  background: currentPreset.gradient,
+                  filter: `brightness(${settings.bannerBrightness}%)`,
+                }
+          }
         />
 
         {/* Ambient Overlay dynamically matched to active theme preset */}
@@ -155,11 +163,12 @@ export default function HeroTrackerSection({ onProductTracked }: Props) {
             </div>
           </form>
 
-          {/* Sub-search Callout Capsule Pill */}
+          {/* Supported Platforms Pill */}
           <div className="mt-4 px-3 sm:px-4 py-1.5 rounded-full bg-black/40 backdrop-blur-md border border-white/15 text-[11px] sm:text-xs text-gray-200 font-medium flex items-center justify-center gap-1.5 flex-wrap shadow-sm text-center">
-            <span>🍧</span>
-            <span><strong>Find Best Price</strong> by adding <span className="text-amber-300 font-bold">priceping.in/</span> before any product link • Works with <strong className="text-amber-200">Amazon, Flipkart, AJIO, Myntra & Nykaa</strong></span>
+            <span>•</span>
+            <span>Works with <strong className="text-amber-300">Amazon, Flipkart, AJIO, Myntra &amp; Nykaa</strong></span>
           </div>
+
         </div>
       </section>
 

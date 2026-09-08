@@ -8,6 +8,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 ENV_PATH = BASE_DIR / ".env"
 
 
+BACKEND_DIR = Path(__file__).resolve().parent.parent
+DEFAULT_DB_FILE = (BACKEND_DIR / "pricewatch.db").as_posix()
+
+
 class Settings(BaseSettings):
     # Application
     APP_NAME: str = "PriceWatch India"
@@ -15,7 +19,7 @@ class Settings(BaseSettings):
     DEBUG: bool = False
 
     # Database (defaults to local SQLite if not configured or postgres is unavailable)
-    DATABASE_URL: str = "sqlite:///./pricewatch.db"
+    DATABASE_URL: str = f"sqlite:///{DEFAULT_DB_FILE}"
 
     # Redis & Celery
     REDIS_URL: str = "redis://localhost:6379/0"
@@ -72,4 +76,25 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+# BUG-017 / BUG-018 FIX: Refuse to start in production with default secrets.
+# A missing .env or unconfigured deployment would silently use weak defaults,
+# making all JWT tokens forgeable and leaving admin with a known password.
+_WEAK_SECRET = "changethisinproduction-supersecretkey"
+_WEAK_ADMIN_PASS = "adminpassword123"
+
+if not settings.DEBUG:
+    if settings.SECRET_KEY == _WEAK_SECRET:
+        raise RuntimeError(
+            "FATAL: SECRET_KEY is set to the insecure default value. "
+            "Set a strong random SECRET_KEY in your environment before running in production."
+        )
+    if settings.FIRST_SUPERUSER_PASSWORD == _WEAK_ADMIN_PASS:
+        import warnings
+        warnings.warn(
+            "WARNING: FIRST_SUPERUSER_PASSWORD is set to the insecure default 'adminpassword123'. "
+            "Set a strong password in your environment.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
 

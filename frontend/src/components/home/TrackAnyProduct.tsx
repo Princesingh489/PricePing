@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { CheckCircle2, ArrowRight, Bell, Sparkles } from 'lucide-react';
-import { formatINR } from '../../utils/helpers';
+import { formatINR, DEFAULT_PRODUCT_IMAGE } from '../../utils/helpers';
 
 export default function TrackAnyProduct() {
   return (
@@ -20,11 +20,11 @@ export default function TrackAnyProduct() {
               <div className="flex gap-4 items-center">
                 <div className="w-20 h-20 rounded-2xl bg-indigo-50/60 border border-indigo-100 flex items-center justify-center p-2 flex-shrink-0">
                   <img
-                    src="https://images.unsplash.com/photo-1592750475338-74b7b21085ab?w=160&auto=format&fit=crop&q=80"
-                    alt="iPhone 15 Pro"
+                    src="https://m.media-amazon.com/images/I/71d7rfSl0wL._SX679_.jpg"
+                    alt="iPhone 15"
                     className="w-full h-full object-contain mix-blend-multiply"
                     onError={(e) => {
-                      (e.target as HTMLImageElement).src = 'https://placehold.co/80x80/f8fafc/6366f1?text=Phone';
+                      (e.target as HTMLImageElement).src = DEFAULT_PRODUCT_IMAGE;
                     }}
                   />
                 </div>

@@ -23,6 +23,7 @@ router = APIRouter(prefix="/api/trending-deals", tags=["Trending Deals"])
 async def get_trending_deals(
     store: Optional[str] = Query(None, description="Filter by store: all, amazon, flipkart, myntra, ajio, nykaa"),
     category: Optional[str] = Query(None, description="Filter by category"),
+    refresh: Optional[bool] = Query(False, description="Force re-evaluation and rotation of deals"),
     db: Session = Depends(get_db),
 ):
     """
@@ -33,6 +34,7 @@ async def get_trending_deals(
         db=db,
         store_filter=store,
         category_filter=category,
+        force_refresh=bool(refresh),
     )
 
 

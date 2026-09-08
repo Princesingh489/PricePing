@@ -103,24 +103,54 @@ class DealEngine:
         candidate_deals: List[Dict[str, Any]],
         target_total: int = 20,
         per_store_target: int = 4,
+        rotation_seed: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
         """
         Step 24 & Step 25:
-        Enforces 5-store balanced ranking and category diversification:
+        Enforces 5-store balanced ranking, legitimate highest discounts, and dynamic rotation:
         - Filters candidates using DealValidator (fail-closed, only LIVE/RECENT).
         - Groups candidates by store (amazon, flipkart, myntra, ajio, nykaa).
-        - Selects top deals per store to ensure all 5 stores have strong representation.
-        - Fills any remaining slots from the highest-ranked remaining validated candidates.
+        - Ranks candidates primarily by discount percentage and deal score.
+        - Rotates candidates on every refresh using rotation_seed so products dynamically change.
+        - Strictly deduplicates by normalized URL, title, and ID so identical items never appear.
         """
+        import re
+
+        def get_deal_identifiers(d: Dict[str, Any]) -> List[str]:
+            ids = []
+            url = d.get("product_url") or ""
+            if url:
+                clean_url = url.split("?")[0].split("&lid=")[0].rstrip("/").lower()
+                ids.append(f"url_{clean_url}")
+            title = d.get("title") or ""
+            if title:
+                clean_title = re.sub(r"[^a-z0-9]", "", title.lower())[:35]
+                if clean_title:
+                    ids.append(f"title_{clean_title}")
+            d_key = d.get("deal_key") or d.get("id")
+            if d_key:
+                ids.append(f"key_{d_key}")
+            return ids
+
         # 1. Validate all candidates
         validated_pool: List[Dict[str, Any]] = []
+        seen_identifiers = set()
+
         for cand in candidate_deals:
             is_valid, errors, deal_status = DealValidator.validate_candidate(cand)
             if is_valid:
+                cand_ids = get_deal_identifiers(cand)
+                # Deduplicate within candidate pool
+                if any(ci in seen_identifiers for ci in cand_ids):
+                    continue
+
                 # Calculate Deal Score and badge if not present
+                price = float(cand.get("price", 0))
+                mrp = float(cand.get("mrp") or price)
+                disc_pct = round(((mrp - price) / mrp) * 100, 1) if mrp > price else 0.0
+                cand["discount_percent"] = disc_pct
+
                 if "deal_score" not in cand or not cand["deal_score"]:
-                    price = cand.get("price", 0)
-                    mrp = cand.get("mrp")
                     score, badge = cls.calculate_deal_score(
                         price=price,
                         mrp=mrp,
@@ -138,14 +168,19 @@ class DealEngine:
                 cand["deal_status"] = "LIVE"
                 cand["is_live"] = True
                 validated_pool.append(cand)
+                for ci in cand_ids:
+                    seen_identifiers.add(ci)
             else:
                 cand["deal_status"] = deal_status
                 cand["is_live"] = False
 
-        # Sort pool by deal_score descending
-        validated_pool.sort(key=lambda d: d.get("deal_score", 0), reverse=True)
+        # Sort pool primarily by highest discount percentage, then deal score
+        validated_pool.sort(
+            key=lambda d: (d.get("discount_percent", 0), d.get("deal_score", 0)),
+            reverse=True,
+        )
 
-        # 2. Balanced 5-store selection with dynamic time-based rotation
+        # 2. Balanced 5-store selection with dynamic rotation
         by_store: Dict[str, List[Dict[str, Any]]] = {
             "amazon": [],
             "flipkart": [],
@@ -159,14 +194,25 @@ class DealEngine:
             if store_name in by_store:
                 by_store[store_name].append(deal)
 
+        # Ensure each store's list is sorted by discount % and score
+        for store_name in by_store:
+            by_store[store_name].sort(
+                key=lambda d: (d.get("discount_percent", 0), d.get("deal_score", 0)),
+                reverse=True,
+            )
+
         selected_deals: List[Dict[str, Any]] = []
-        chosen_ids = set()
+        chosen_keys = set()
 
-        # Dynamic time-slot rotation: rotates candidate selection every 2 minutes so deals change over time
-        now_ts = int(datetime.now(timezone.utc).timestamp())
-        time_slot = (now_ts // 120) % 12
+        # Dynamic rotation calculation:
+        # If rotation_seed is provided, use it directly; otherwise rotate every 60 seconds
+        if rotation_seed is not None:
+            active_rotation = int(rotation_seed)
+        else:
+            now_ts = int(datetime.now(timezone.utc).timestamp())
+            active_rotation = (now_ts // 60)
 
-        # Phase A: Pick up to per_store_target for each store with time-based rotation
+        # Phase A: Pick up to per_store_target for each store with dynamic rotation
         for store_key in ["amazon", "flipkart", "myntra", "ajio", "nykaa"]:
             store_candidates = by_store[store_key]
             if not store_candidates:
@@ -174,30 +220,39 @@ class DealEngine:
 
             n = len(store_candidates)
             if n > per_store_target:
-                offset = time_slot % n
+                # Rotate across pool of high-discount candidates
+                offset = active_rotation % n
                 rotated = store_candidates[offset:] + store_candidates[:offset]
             else:
                 rotated = store_candidates
 
             picked = 0
             for deal in rotated:
-                d_id = deal.get("id") or deal.get("deal_key") or deal.get("product_url")
-                if d_id not in chosen_ids and picked < per_store_target:
+                d_ids = get_deal_identifiers(deal)
+                if not any(di in chosen_keys for di in d_ids) and picked < per_store_target:
                     selected_deals.append(deal)
-                    chosen_ids.add(d_id)
+                    for di in d_ids:
+                        chosen_keys.add(di)
                     picked += 1
 
-        # Phase B: Fill remaining slots up to target_total with highest-scoring unchosen deals
+        # Phase B: Fill remaining slots up to target_total with highest-discount unchosen deals
         if len(selected_deals) < target_total:
-            remaining = [d for d in validated_pool if (d.get("id") or d.get("deal_key") or d.get("product_url")) not in chosen_ids]
+            remaining = [
+                d for d in validated_pool
+                if not any(di in chosen_keys for di in get_deal_identifiers(d))
+            ]
             for deal in remaining:
                 if len(selected_deals) >= target_total:
                     break
                 selected_deals.append(deal)
-                chosen_ids.add(deal.get("id") or deal.get("deal_key") or deal.get("product_url"))
+                for di in get_deal_identifiers(deal):
+                    chosen_keys.add(di)
 
-        # Final sort of selected deals by deal_score descending
-        selected_deals.sort(key=lambda d: d.get("deal_score", 0), reverse=True)
+        # Final sort: legitimate highest discount first, then deal score
+        selected_deals.sort(
+            key=lambda d: (d.get("discount_percent", 0), d.get("deal_score", 0)),
+            reverse=True,
+        )
         return selected_deals
 
     @classmethod

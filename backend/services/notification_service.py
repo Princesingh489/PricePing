@@ -206,13 +206,10 @@ def send_price_alert(
             product_url=product.product_url,
             alert_description=alert_description,
         )
-        sent = send_email_notification(to_email=user.email, subject=subject, body_html=html)
-        if sent:
-            create_in_app_notification(
-                db=db, user_id=user.id, product_id=product.id,
-                title=subject, message=message,
-                notification_type=models.NotificationTypeEnum.email,
-            )
+        # BUG-013 FIX: Do NOT create a second in-app notification on email success.
+        # An in-app notification was already created above. Email delivery is a transport concern,
+        # not a separate notification record. The original code created 2 in-app notifications.
+        send_email_notification(to_email=user.email, subject=subject, body_html=html)
 
     # SMS notification
     if alert.notify_sms and user.sms_notifications and user.phone_number:

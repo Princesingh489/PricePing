@@ -68,7 +68,9 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: uvicorn main:app --host 0.0.0.0 --port 8000
+    # BUG-021 FIX: Added --workers 4 for multi-threaded production throughput.
+    # Single-worker uvicorn is only appropriate for development.
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8000/api/health || exit 1"]
       interval: 15s
@@ -77,10 +79,8 @@ services:
 
   # Celery Worker (Scraper Pipeline with Playwright)
   worker:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    image: priceping-worker:latest
+    # BUG-022 FIX: Reuse the already-built backend image instead of rebuilding.
+    image: priceping-backend:latest
     container_name: priceping_worker
     restart: unless-stopped
     networks:
@@ -101,10 +101,8 @@ services:
 
   # Celery Beat (Periodic Schedule Monitor)
   beat:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    image: priceping-beat:latest
+    # BUG-022 FIX: Reuse the already-built backend image instead of rebuilding.
+    image: priceping-backend:latest
     container_name: priceping_beat
     restart: unless-stopped
     networks:
@@ -124,10 +122,10 @@ services:
 
   # Flower (Celery Monitoring Dashboard)
   flower:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    image: priceping-flower:latest
+    # BUG-022 FIX: Reuse the already-built backend image instead of rebuilding.
+    # BUG-023 FIX: Added --basic_auth to protect Flower dashboard from public access.
+    # Set FLOWER_USER and FLOWER_PASSWORD in your .env file.
+    image: priceping-backend:latest
     container_name: priceping_flower
     restart: unless-stopped
     networks:
@@ -144,7 +142,11 @@ services:
       interval: 15s
       timeout: 5s
       retries: 3
-    command: celery -A worker.celery_app flower --port=5555 --address=0.0.0.0
+    command: >-
+      celery -A worker.celery_app flower
+      --port=5555
+      --address=0.0.0.0
+      --basic_auth=${FLOWER_USER:-admin}:${FLOWER_PASSWORD:-flowerpassword}
 
   # React Frontend (Self-contained Nginx Production Build)
   frontend:

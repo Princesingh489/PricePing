@@ -169,7 +169,7 @@ export default function ThemeCustomizerModal({ isOpen, onClose }: Props) {
             onClick={() => {
               resetTheme();
               setCustomUrlInput('');
-              toast.success('Reset to default festive theme');
+              toast.success('Reset to default cyber dark theme');
             }}
             className="flex items-center gap-2 text-xs text-gray-400 hover:text-white transition-colors"
           >

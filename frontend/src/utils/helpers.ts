@@ -84,3 +84,7 @@ export function detectPlatform(url: string): Platform {
   if (l.includes('nykaa.com')) return 'nykaa';
   return 'unknown';
 }
+
+export const DEFAULT_PRODUCT_IMAGE =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200' fill='none'%3E%3Crect width='200' height='200' rx='16' fill='%23f8fafc'/%3E%3Cpath d='M65 80h70l-8 70H73L65 80z' stroke='%2394a3b8' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M85 80V65a15 15 0 0 1 30 0v15' stroke='%2394a3b8' stroke-width='6' stroke-linecap='round'/%3E%3C/svg%3E";
+

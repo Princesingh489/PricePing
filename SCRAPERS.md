@@ -131,6 +131,9 @@ E-commerce prices often vary dramatically by size (e.g. a shoe in *UK 8* might c
 3. **URL Parameter Injection**:
    Extracting a specific size automatically maps to its canonical direct purchase URL (e.g., preserving `size=8` or `th=1&psc=1`).
 
+4. **Downstream UI & Alert Telemetry Integration**:
+   Extracted store badges, canonical direct outlinks, and variant keys flow directly into consumer views ([ProductDetailPage.tsx](file:///c:/Users/Prince/Desktop/PricePing/frontend/src/pages/ProductDetailPage.tsx), [MyProducts.tsx](file:///c:/Users/Prince/Desktop/PricePing/frontend/src/pages/MyProducts.tsx), and [Alerts.tsx](file:///c:/Users/Prince/Desktop/PricePing/frontend/src/pages/Alerts.tsx)), enabling instant outbound store redirection with pre-selected sizing.
+
 ---
 
 ## 🛡️ Anti-False Price Shield & Strict Invariants

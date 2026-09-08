@@ -5,6 +5,7 @@ import PriceHistoryChart from '../components/charts/PriceHistoryChart';
 import { LineChart, PlusCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import EmptyState from '../components/common/EmptyState';
+import { DEFAULT_PRODUCT_IMAGE } from '../utils/helpers';
 
 export default function PriceHistoryPage() {
   const [products, setProducts] = useState<TrackedProduct[]>([]);
@@ -63,9 +64,12 @@ export default function PriceHistoryPage() {
                 }`}
               >
                 <img
-                  src={item.product.product_image || 'https://placehold.co/40x40/f8fafc/6366f1?text=Product'}
+                  src={item.product.product_image || DEFAULT_PRODUCT_IMAGE}
                   alt=""
                   className="w-8 h-8 rounded-lg object-contain bg-white border border-gray-200 p-0.5 flex-shrink-0"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = DEFAULT_PRODUCT_IMAGE;
+                  }}
                 />
                 <span className="text-xs font-bold text-navy-900 max-w-[160px] truncate">
                   {item.product.product_name}

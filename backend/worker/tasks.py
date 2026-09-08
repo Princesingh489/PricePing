@@ -174,6 +174,18 @@ def perform_product_price_check(product_id: int):
             condition_met, description = evaluate_alert(alert, product)
 
             if condition_met and not alert.is_in_range:
+                # BUG-012 FIX: Add 24-hour cooldown to prevent spam notifications.
+                # Without this, alerts re-trigger on every price check (every 60s) if price stays below target.
+                cooldown_hours = 24
+                if alert.last_triggered_at:
+                    hours_since_trigger = (datetime.utcnow() - alert.last_triggered_at).total_seconds() / 3600
+                    if hours_since_trigger < cooldown_hours:
+                        logger.info(f"Alert {alert.id} cooldown active ({hours_since_trigger:.1f}h / {cooldown_hours}h). Skipping notification.")
+                        # Still update is_in_range so the reset logic works
+                        alert.is_in_range = True
+                        db.commit()
+                        continue
+
                 # Transition from not-met to met → Send alert
                 alert.is_in_range = True
                 alert.last_triggered_at = datetime.utcnow()

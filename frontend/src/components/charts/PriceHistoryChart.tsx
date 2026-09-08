@@ -17,7 +17,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { formatINR, PLATFORM_LABELS } from '../../utils/helpers';
+import { formatINR, PLATFORM_LABELS, DEFAULT_PRODUCT_IMAGE } from '../../utils/helpers';
 import type { Product, PriceHistory, RealPriceHistoryPoint, RealPriceHistoryResponse } from '../../types';
 import { productsApi } from '../../services/api';
 
@@ -154,11 +154,11 @@ export default function PriceHistoryChart({ product }: PriceHistoryChartProps) {
           <div className="flex gap-4 items-center min-w-0">
             <div className="w-16 h-16 rounded-2xl bg-gray-50 border border-gray-200 flex items-center justify-center p-2 flex-shrink-0 shadow-2xs overflow-hidden">
               <img
-                src={product.product_image || 'https://placehold.co/80x80/f8fafc/6366f1?text=Product'}
+                src={product.product_image || DEFAULT_PRODUCT_IMAGE}
                 alt={product.product_name}
                 className="w-full h-full object-contain"
                 onError={(e) => {
-                  (e.target as HTMLImageElement).src = 'https://placehold.co/80x80/f8fafc/6366f1?text=Product';
+                  (e.target as HTMLImageElement).src = DEFAULT_PRODUCT_IMAGE;
                 }}
               />
             </div>

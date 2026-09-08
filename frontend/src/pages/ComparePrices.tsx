@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { productsApi } from '../services/api';
 import type { TrackedProduct } from '../types';
-import { formatINR } from '../utils/helpers';
+import { formatINR, DEFAULT_PRODUCT_IMAGE } from '../utils/helpers';
 import { Scale, ExternalLink, PlusCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import EmptyState from '../components/common/EmptyState';
@@ -101,11 +101,11 @@ export default function ComparePrices() {
                   <div className="flex items-center gap-4 min-w-0">
                     <div className="w-16 h-16 rounded-2xl bg-gray-50 border border-gray-200 flex items-center justify-center p-2 flex-shrink-0">
                       <img
-                        src={p.product_image || 'https://placehold.co/64x64/f8fafc/6366f1?text=Product'}
+                        src={p.product_image || DEFAULT_PRODUCT_IMAGE}
                         alt={p.product_name}
                         className="w-full h-full object-contain"
                         onError={(e) => {
-                          (e.target as HTMLImageElement).src = 'https://placehold.co/64x64/f8fafc/6366f1?text=Product';
+                          (e.target as HTMLImageElement).src = DEFAULT_PRODUCT_IMAGE;
                         }}
                       />
                     </div>

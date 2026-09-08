@@ -20,6 +20,8 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # BUG-006 FIX: Initialize monitor_task before try block so shutdown cleanup is always safe
+    monitor_task = None
     """Create database tables on startup."""
     logger.info("Starting PriceWatch India API...")
     try:
@@ -137,6 +139,8 @@ async def lifespan(app: FastAPI):
         logger.info("Database tables and columns verified.")
 
         # Create default admin user if not exists
+        # BUG-003 FIX: Only set password during first creation.
+        # Do NOT overwrite on every startup — admins must be able to change their password.
         from db.database import SessionLocal
         from core.security import get_password_hash
         with SessionLocal() as db:
@@ -155,11 +159,17 @@ async def lifespan(app: FastAPI):
                 db.commit()
                 logger.info(f"Admin user created: {settings.FIRST_SUPERUSER_EMAIL}")
             else:
-                admin_user.password_hash = get_password_hash(settings.FIRST_SUPERUSER_PASSWORD)
-                admin_user.is_active = True
-                admin_user.is_admin = True
-                db.commit()
-                logger.info(f"Admin user password verified/synced: {settings.FIRST_SUPERUSER_EMAIL}")
+                # Only ensure admin flags are set; NEVER overwrite a manually changed password
+                changed = False
+                if not admin_user.is_active:
+                    admin_user.is_active = True
+                    changed = True
+                if not admin_user.is_admin:
+                    admin_user.is_admin = True
+                    changed = True
+                if changed:
+                    db.commit()
+                logger.info(f"Admin user verified: {settings.FIRST_SUPERUSER_EMAIL}")
         import asyncio
         async def periodic_price_monitor():
             while True:
@@ -178,7 +188,8 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    if "monitor_task" in locals() and monitor_task:
+    # BUG-006 FIX: monitor_task initialized before try block so this is always safe
+    if monitor_task is not None:
         monitor_task.cancel()
     logger.info("Shutting down PriceWatch India API.")
 

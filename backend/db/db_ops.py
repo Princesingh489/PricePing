@@ -88,9 +88,12 @@ async def bulk_insert_history(
     if not rows:
         return 0
 
-    # Determine database dialect
+    # BUG-005 FIX: Reliably detect database dialect.
+    # Old code defaulted to 'postgresql' when bind was None (possible with async sessions),
+    # which caused pg_insert to be used on SQLite databases, crashing bulk inserts.
+    from db.database import engine as _engine
     bind = session.bind if hasattr(session, "bind") and session.bind else None
-    dialect_name = bind.dialect.name if bind else "postgresql"
+    dialect_name = (bind.dialect.name if bind else None) or _engine.dialect.name
 
     inserted_count = 0
 

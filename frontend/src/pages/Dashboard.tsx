@@ -35,7 +35,9 @@ export default function Dashboard() {
         setStats(statsRes.data);
         setRecentProducts(productsRes.data || []);
       })
-      .catch(() => {})
+      // BUG-014 FIX: Always show an error to the user on fetch failure.
+      // The old .catch(() => {}) silently swallowed errors, leaving users with blank data and no explanation.
+      .catch(() => toast.error('Failed to load dashboard data. Please refresh the page.'))
       .finally(() => setLoading(false));
   };
 

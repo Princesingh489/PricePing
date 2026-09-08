@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { productsApi } from '../services/api';
-import type { TrackedProduct } from '../types';
+import type { TrackedProduct, PriceAlert } from '../types';
 import toast from 'react-hot-toast';
 import {
   PlusCircle, ShoppingBag
@@ -11,8 +11,8 @@ import ProductFilters from '../components/products/ProductFilters';
 import { ProductCardSkeleton } from '../components/common/SkeletonLoader';
 import EmptyState from '../components/common/EmptyState';
 import PriceHistoryModal from '../components/modals/PriceHistoryModal';
-
 import DeleteTrackingModal from '../components/modals/DeleteTrackingModal';
+import SetPriceAlertModal from '../components/modals/SetPriceAlertModal';
 
 export default function MyProducts() {
   const [products, setProducts] = useState<TrackedProduct[]>([]);
@@ -22,9 +22,15 @@ export default function MyProducts() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
   const [selectedProductForHistory, setSelectedProductForHistory] = useState<any>(null);
+  
+  // Delete modal state
   const [trackerToDelete, setTrackerToDelete] = useState<TrackedProduct | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // Price Alert modal state
+  const [trackerForAlert, setTrackerForAlert] = useState<TrackedProduct | null>(null);
+  const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
 
   const fetchProducts = useCallback(() => {
     setLoading(true);
@@ -74,6 +80,43 @@ export default function MyProducts() {
     }
   };
 
+  // Price Alert Handlers
+  const handleOpenAlertModal = (tracker: TrackedProduct) => {
+    setTrackerForAlert(tracker);
+    setIsAlertModalOpen(true);
+  };
+
+  const handleAlertSaved = (updatedAlert: PriceAlert) => {
+    setProducts((prev) =>
+      prev.map((t) => {
+        if (t.product_id === updatedAlert.product_id || t.id === trackerForAlert?.id) {
+          return {
+            ...t,
+            alert: updatedAlert,
+            target_min_price: updatedAlert.target_price,
+          };
+        }
+        return t;
+      })
+    );
+  };
+
+  const handleAlertRemoved = (productId: number) => {
+    setProducts((prev) =>
+      prev.map((t) => {
+        if (t.product_id === productId || t.id === trackerForAlert?.id) {
+          return {
+            ...t,
+            alert: null,
+            target_min_price: undefined,
+          };
+        }
+        return t;
+      })
+    );
+  };
+
+  // Delete Handlers
   const promptDelete = (tracker: TrackedProduct) => {
     setTrackerToDelete(tracker);
     setIsDeleteModalOpen(true);
@@ -159,6 +202,7 @@ export default function MyProducts() {
             <ProductCard
               key={tracker.id}
               tracker={tracker}
+              onSetAlert={handleOpenAlertModal}
               onViewHistory={(t) => setSelectedProductForHistory(t.product)}
               onRefresh={handleRefresh}
               onPause={handlePause}
@@ -170,6 +214,20 @@ export default function MyProducts() {
         </div>
       )}
 
+      {/* Set / Edit Price Alert Modal */}
+      {trackerForAlert && (
+        <SetPriceAlertModal
+          isOpen={isAlertModalOpen}
+          tracker={trackerForAlert}
+          onClose={() => {
+            setIsAlertModalOpen(false);
+            setTrackerForAlert(null);
+          }}
+          onAlertSaved={handleAlertSaved}
+          onAlertRemoved={handleAlertRemoved}
+        />
+      )}
+
       {/* Detailed Price History Modal */}
       {selectedProductForHistory && (
         <PriceHistoryModal
@@ -178,7 +236,7 @@ export default function MyProducts() {
         />
       )}
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete Confirmation Modal (Invoked via 3-dot menu) */}
       {trackerToDelete && (
         <DeleteTrackingModal
           tracker={trackerToDelete}

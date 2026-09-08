@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import datetime
@@ -81,17 +82,23 @@ def forgot_password(payload: ForgotPassword, db: Session = Depends(get_db)):
     return {"message": "If this email exists, a password reset link has been sent."}
 
 
+class ChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str
+
+
 @router.post("/change-password")
 def change_password(
-    old_password: str,
-    new_password: str,
+    payload: ChangePasswordRequest,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    if not verify_password(old_password, current_user.password_hash):
+    # BUG-001 FIX: Passwords now received in request body (not URL query params).
+    # Query params are logged by web servers, proxies, and load balancers.
+    if not verify_password(payload.old_password, current_user.password_hash):
         raise HTTPException(status_code=400, detail="Incorrect current password")
-    if len(new_password) < 8:
+    if len(payload.new_password) < 8:
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
-    current_user.password_hash = get_password_hash(new_password)
+    current_user.password_hash = get_password_hash(payload.new_password)
     db.commit()
     return {"message": "Password updated successfully"}

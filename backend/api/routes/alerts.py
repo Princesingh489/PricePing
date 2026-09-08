@@ -16,18 +16,25 @@ def create_alert(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    """Create a price alert for a tracked product."""
-    # Verify user tracks this product
+    product = db.query(models.Product).filter(models.Product.id == payload.product_id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    # Verify user tracks this product; if not yet tracked, auto-track it
     tracker = db.query(models.UserTrackedProduct).filter(
         models.UserTrackedProduct.user_id == current_user.id,
         models.UserTrackedProduct.product_id == payload.product_id,
     ).first()
     if not tracker:
-        raise HTTPException(status_code=404, detail="Product not in your tracking list. Add it first.")
-
-    product = db.query(models.Product).filter(models.Product.id == payload.product_id).first()
-    if not product:
-        raise HTTPException(status_code=404, detail="Product not found")
+        tracker = models.UserTrackedProduct(
+            user_id=current_user.id,
+            product_id=payload.product_id,
+            tracking_status=models.TrackingStatusEnum.active,
+            # BUG-007 FIX: UserTrackedProduct has no 'target_price'; use target_min_price instead
+            target_min_price=payload.target_price or product.current_price,
+        )
+        db.add(tracker)
+        db.flush()
 
     alert = models.PriceAlert(
         user_id=current_user.id,

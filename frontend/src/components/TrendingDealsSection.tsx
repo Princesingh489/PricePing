@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { formatINR, PLATFORM_LABELS, getPlatformBadgeClass } from '../utils/helpers';
+import { formatINR, PLATFORM_LABELS, getPlatformBadgeClass, DEFAULT_PRODUCT_IMAGE } from '../utils/helpers';
 import { useLanguage } from '../contexts/LanguageContext';
 import { productsApi, dealsApi } from '../services/api';
 import toast from 'react-hot-toast';
 import {
-  ExternalLink, Sparkles, Star, RefreshCw, Trash2, Loader2, RotateCcw
+  ExternalLink, Sparkles, Star, RefreshCw, Loader2, BookmarkPlus, Check
 } from 'lucide-react';
 import QuickTrackModal from './QuickTrackModal';
 import type { TrendingDeal, Platform } from '../types';
@@ -36,22 +36,147 @@ export default function TrendingDealsSection({ onQuickTrack: _onQuickTrack }: Pr
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [resolvingDealId, setResolvingDealId] = useState<string | null>(null);
 
-  // Persist dismissed/deleted deals in localStorage so they do not reappear
-  const [dismissedDealIds, setDismissedDealIds] = useState<Set<string>>(() => {
+  // Persist tracked product URLs/keys in state & localStorage to display "Tracked ✓"
+  const [trackedProductUrls, setTrackedProductUrls] = useState<Set<string>>(() => {
     try {
-      const saved = localStorage.getItem('priceping_dismissed_deals');
+      const saved = localStorage.getItem('priceping_user_tracked_urls');
       return saved ? new Set(JSON.parse(saved)) : new Set();
     } catch {
       return new Set();
     }
   });
+  const [trackingDealId, setTrackingDealId] = useState<string | null>(null);
 
-  const fetchLiveDeals = useCallback(async (showLoadingSpinner: boolean = false) => {
+  // Sync tracked products from API to ensure already-tracked items show "Tracked ✓"
+  const refreshTrackedList = useCallback(async () => {
+    try {
+      const res = await productsApi.list();
+      const list = res.data;
+      if (Array.isArray(list) && list.length > 0) {
+        setTrackedProductUrls((prev) => {
+          const next = new Set(prev);
+          list.forEach((item: any) => {
+            const p = item.product || item;
+            if (p.product_url) {
+              next.add(p.product_url);
+              try {
+                const u = new URL(p.product_url);
+                next.add(`${u.origin}${u.pathname}`.toLowerCase().replace(/\/+$/, ''));
+              } catch {}
+            }
+            if (p.canonical_url) {
+              next.add(p.canonical_url);
+            }
+            if (p.external_product_id) {
+              next.add(p.external_product_id);
+            }
+            if (p.product_name) {
+              next.add(p.product_name.toLowerCase().trim());
+            }
+          });
+          try {
+            localStorage.setItem('priceping_user_tracked_urls', JSON.stringify(Array.from(next)));
+          } catch {}
+          return next;
+        });
+      }
+    } catch (err) {
+      // Graceful fallback for offline / guest mode
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshTrackedList();
+  }, [refreshTrackedList]);
+
+  const isDealTracked = useCallback((deal: TrendingDeal): boolean => {
+    if (!deal) return false;
+    if (trackedProductUrls.has(deal.product_url)) return true;
+    try {
+      const u = new URL(deal.product_url);
+      const clean = `${u.origin}${u.pathname}`.toLowerCase().replace(/\/+$/, '');
+      if (trackedProductUrls.has(clean)) return true;
+    } catch {}
+    if (deal.title && trackedProductUrls.has(deal.title.toLowerCase().trim())) return true;
+    if (deal.deal_key && trackedProductUrls.has(deal.deal_key)) return true;
+    if (deal.id && trackedProductUrls.has(deal.id)) return true;
+    if (deal.product_id && trackedProductUrls.has(String(deal.product_id))) return true;
+    return false;
+  }, [trackedProductUrls]);
+
+  const handleTrackProduct = async (deal: TrendingDeal, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isDealTracked(deal)) {
+      toast('Product is already in My Tracked Products', { icon: 'ℹ️' });
+      return;
+    }
+
+    setTrackingDealId(deal.id);
+    try {
+      await productsApi.add({
+        product_url: deal.product_url,
+        product_name: deal.title,
+        current_price: deal.price,
+        original_price: deal.mrp,
+        discount_percentage: deal.discount_percent,
+        product_image: deal.image_url,
+        image_url: deal.image_url,
+        rating: deal.rating,
+        rating_count: deal.rating_count,
+        brand: deal.brand,
+        store: deal.store,
+      });
+
+      // Update local set and persistence
+      setTrackedProductUrls((prev) => {
+        const next = new Set(prev);
+        next.add(deal.product_url);
+        try {
+          const u = new URL(deal.product_url);
+          next.add(`${u.origin}${u.pathname}`.toLowerCase().replace(/\/+$/, ''));
+        } catch {}
+        if (deal.title) next.add(deal.title.toLowerCase().trim());
+        if (deal.deal_key) next.add(deal.deal_key);
+        if (deal.id) next.add(deal.id);
+        try {
+          localStorage.setItem('priceping_user_tracked_urls', JSON.stringify(Array.from(next)));
+        } catch {}
+        return next;
+      });
+
+      toast.success(`Tracked "${deal.title.slice(0, 26)}..." in My Tracked Products! 🎯`, {
+        icon: '✓',
+        duration: 3500,
+      });
+    } catch (err: any) {
+      console.warn('API tracking note, saving locally:', err);
+      setTrackedProductUrls((prev) => {
+        const next = new Set(prev);
+        next.add(deal.product_url);
+        try {
+          const u = new URL(deal.product_url);
+          next.add(`${u.origin}${u.pathname}`.toLowerCase().replace(/\/+$/, ''));
+        } catch {}
+        if (deal.title) next.add(deal.title.toLowerCase().trim());
+        if (deal.deal_key) next.add(deal.deal_key);
+        if (deal.id) next.add(deal.id);
+        try {
+          localStorage.setItem('priceping_user_tracked_urls', JSON.stringify(Array.from(next)));
+        } catch {}
+        return next;
+      });
+      toast.success(`Added to My Tracked Products! 🎯`, { icon: '✓' });
+    } finally {
+      setTrackingDealId(null);
+    }
+  };
+
+  const fetchLiveDeals = useCallback(async (showLoadingSpinner: boolean = false, forceRotate: boolean = false) => {
     if (showLoadingSpinner) {
       setIsLoading(true);
     }
     try {
-      const res = await dealsApi.getTrending();
+      const res = await dealsApi.getTrending(forceRotate ? { refresh: true } : undefined);
       const payload = res.data;
       if (payload && Array.isArray(payload.deals) && payload.deals.length > 0) {
         setDeals(payload.deals);
@@ -84,31 +209,8 @@ export default function TrendingDealsSection({ onQuickTrack: _onQuickTrack }: Pr
   const handleManualRefresh = () => {
     setIsRefreshing(true);
     dealsApi.refresh()
-      .then(() => fetchLiveDeals(false))
-      .catch(() => fetchLiveDeals(false));
-  };
-
-  // Delete/dismiss a deal from user's view
-  const handleDeleteDeal = (dealId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setDismissedDealIds((prev) => {
-      const next = new Set(prev);
-      next.add(dealId);
-      try {
-        localStorage.setItem('priceping_dismissed_deals', JSON.stringify(Array.from(next)));
-      } catch (err) {
-        console.warn('Could not persist dismissed deal to localStorage', err);
-      }
-      return next;
-    });
-    toast.success('Deal removed from trending', { icon: '🗑️' });
-  };
-
-  // Restore dismissed deals if needed
-  const handleRestoreDismissed = () => {
-    setDismissedDealIds(new Set());
-    localStorage.removeItem('priceping_dismissed_deals');
-    toast.success('Restored all deleted deals');
+      .then(() => fetchLiveDeals(false, true))
+      .catch(() => fetchLiveDeals(false, true));
   };
 
   // Problem 1: Clicking Product or Title opens full comparison modal identical to URL search
@@ -152,15 +254,12 @@ export default function TrendingDealsSection({ onQuickTrack: _onQuickTrack }: Pr
     }
   };
 
-  // Filter out deleted deals
-  const activeDeals = deals.filter((d) => !dismissedDealIds.has(d.id));
-
   const filteredDeals = selectedPlatform === 'all'
-    ? activeDeals
-    : activeDeals.filter((d) => (d.store || '').toLowerCase() === selectedPlatform.toLowerCase());
+    ? deals
+    : deals.filter((d) => (d.store || '').toLowerCase() === selectedPlatform.toLowerCase());
 
   // Store counts for filter badges
-  const storeCounts = activeDeals.reduce((acc, deal) => {
+  const storeCounts = deals.reduce((acc, deal) => {
     const s = (deal.store || '').toLowerCase();
     acc[s] = (acc[s] || 0) + 1;
     return acc;
@@ -190,17 +289,6 @@ export default function TrendingDealsSection({ onQuickTrack: _onQuickTrack }: Pr
               <RefreshCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin' : ''}`} />
               <span>{isRefreshing ? 'Checking...' : 'Refresh'}</span>
             </button>
-
-            {dismissedDealIds.size > 0 && (
-              <button
-                onClick={handleRestoreDismissed}
-                className="inline-flex items-center gap-1 text-[11px] font-bold text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 px-2 py-0.5 rounded-md transition-colors cursor-pointer"
-                title="Restore all deleted deals"
-              >
-                <RotateCcw className="w-3 h-3" />
-                <span>Restore ({dismissedDealIds.size})</span>
-              </button>
-            )}
           </div>
 
           <h2 className="text-2xl sm:text-3xl font-black text-navy-900 tracking-tight">
@@ -214,7 +302,7 @@ export default function TrendingDealsSection({ onQuickTrack: _onQuickTrack }: Pr
         {/* 5 E-Commerce Platform Filter Tabs */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-2 md:pb-0 scrollbar-none">
           {PLATFORMS_FILTER.map((plat) => {
-            const count = plat.id === 'all' ? activeDeals.length : (storeCounts[plat.id] || 0);
+            const count = plat.id === 'all' ? deals.length : (storeCounts[plat.id] || 0);
             const isSelected = selectedPlatform === plat.id;
 
             return (
@@ -242,14 +330,14 @@ export default function TrendingDealsSection({ onQuickTrack: _onQuickTrack }: Pr
       </div>
 
       {/* Loading Skeleton */}
-      {isLoading && activeDeals.length === 0 ? (
+      {isLoading && deals.length === 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 animate-pulse">
           {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
             <div key={n} className="card p-5 bg-white border border-gray-150 rounded-2xl h-80 flex flex-col justify-between">
               <div className="bg-gray-100 rounded-xl h-44 w-full" />
               <div className="space-y-2 mt-4">
-                <div className="bg-gray-100 h-4 rounded w-3/4" />
-                <div className="bg-gray-100 h-4 rounded w-1/2" />
+                <div className="h-4 bg-gray-100 rounded w-3/4" />
+                <div className="h-4 bg-gray-100 rounded w-1/2" />
               </div>
             </div>
           ))}
@@ -257,17 +345,8 @@ export default function TrendingDealsSection({ onQuickTrack: _onQuickTrack }: Pr
       ) : filteredDeals.length === 0 ? (
         /* Empty State */
         <div className="text-center py-12 bg-white border border-dashed border-gray-200 rounded-3xl p-8">
-          <p className="text-base font-bold text-gray-700 mb-1">No deals currently visible in this view</p>
-          <p className="text-xs text-gray-400 mb-4">You may have deleted these deals or selected an empty store filter.</p>
-          {dismissedDealIds.size > 0 && (
-            <button
-              onClick={handleRestoreDismissed}
-              className="btn-secondary text-xs px-4 py-2 cursor-pointer font-bold inline-flex items-center gap-1.5"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>Restore Deleted Deals</span>
-            </button>
-          )}
+          <p className="text-base font-bold text-gray-700 mb-1">No deals currently visible for this store</p>
+          <p className="text-xs text-gray-400 mb-4">Try selecting another store filter or click Refresh to fetch newly discounted products.</p>
         </div>
       ) : (
         /* Deals Grid */
@@ -296,25 +375,14 @@ export default function TrendingDealsSection({ onQuickTrack: _onQuickTrack }: Pr
                   {/* Image and Badges */}
                   <div className="relative rounded-xl overflow-hidden mb-4 bg-gray-50 h-48 flex items-center justify-center border border-gray-100">
                     <img
-                      src={deal.image_url}
+                      src={deal.image_url || DEFAULT_PRODUCT_IMAGE}
                       alt={deal.title}
                       className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-500"
                       loading="lazy"
                       referrerPolicy="no-referrer"
                       onError={(e) => {
                         e.currentTarget.onerror = null;
-                        const cat = (deal.category || '').toLowerCase();
-                        if (cat.includes('audio') || cat.includes('headphone')) {
-                          e.currentTarget.src = 'https://m.media-amazon.com/images/I/61L4SkS7w2L._SX679_.jpg';
-                        } else if (cat.includes('footwear') || cat.includes('shoe') || cat.includes('slipper')) {
-                          e.currentTarget.src = 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=500&auto=format&fit=crop&q=80';
-                        } else if (cat.includes('smart') || cat.includes('phone')) {
-                          e.currentTarget.src = 'https://images.unsplash.com/photo-1592750475338-74b7b21085ab?w=500&auto=format&fit=crop&q=80';
-                        } else if (cat.includes('beauty')) {
-                          e.currentTarget.src = 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=500&auto=format&fit=crop&q=80';
-                        } else {
-                          e.currentTarget.src = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&auto=format&fit=crop&q=80';
-                        }
+                        e.currentTarget.src = DEFAULT_PRODUCT_IMAGE;
                       }}
                     />
                     <div className="absolute top-2.5 left-2.5 flex items-center gap-1 flex-wrap">
@@ -381,18 +449,43 @@ export default function TrendingDealsSection({ onQuickTrack: _onQuickTrack }: Pr
                   </div>
                 </div>
 
-                {/* Action Buttons: Only 2 Buttons (Delete & Buy as requested) */}
+                {/* Action Buttons: Track Product & Buy Now */}
                 <div className="flex items-center gap-2 pt-3 border-t border-gray-100 mt-2">
-                  {/* 1. Delete Button */}
-                  <button
-                    type="button"
-                    onClick={(e) => handleDeleteDeal(deal.id, e)}
-                    className="inline-flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100/80 border border-rose-200/60 transition-all cursor-pointer flex-shrink-0"
-                    title="Delete deal from list"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Delete</span>
-                  </button>
+                  {/* 1. Track Product / Tracked Button */}
+                  {isDealTracked(deal) ? (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toast('Product is already in My Tracked Products', { icon: '🎯' });
+                      }}
+                      className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-300 shadow-2xs transition-all cursor-default flex-shrink-0"
+                      title="Product is in My Tracked Products"
+                    >
+                      <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[2.5]" />
+                      <span>Tracked ✓</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={(e) => handleTrackProduct(deal, e)}
+                      disabled={trackingDealId === deal.id}
+                      className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-indigo-700 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100/90 border border-indigo-200 shadow-2xs transition-all cursor-pointer flex-shrink-0 active:scale-95 disabled:opacity-60"
+                      title="Track Product in My Tracked Products"
+                    >
+                      {trackingDealId === deal.id ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600" />
+                          <span>Tracking...</span>
+                        </>
+                      ) : (
+                        <>
+                          <BookmarkPlus className="w-3.5 h-3.5 text-indigo-600" />
+                          <span>Track Product</span>
+                        </>
+                      )}
+                    </button>
+                  )}
 
                   {/* 2. Buy Button */}
                   <a

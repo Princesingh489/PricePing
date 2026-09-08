@@ -84,6 +84,7 @@ export interface TrackedProduct {
   created_at: string;
   tracked_at?: string;
   product: Product;
+  alert?: PriceAlert | null;
 }
 
 export interface TrackedProductsResponse {
@@ -333,6 +334,7 @@ export interface ProductDetail {
 
 export interface TrendingDeal {
   id: string;
+  deal_key?: string | null;
   product_id: string;
   store: Platform;
   title: string;

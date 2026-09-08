@@ -81,6 +81,14 @@ class ProductCreate(BaseModel):
     target_max_price: Optional[float] = None
     product_name: Optional[str] = None
     current_price: Optional[float] = None
+    original_price: Optional[float] = None
+    discount_percentage: Optional[float] = None
+    product_image: Optional[str] = None
+    image_url: Optional[str] = None
+    rating: Optional[float] = None
+    rating_count: Optional[int] = None
+    brand: Optional[str] = None
+    store: Optional[str] = None
 
     def get_url(self) -> str:
         u = self.url or self.product_url
@@ -142,11 +150,15 @@ class ProductOut(BaseModel):
     rating_count: Optional[int] = None
     review_count: Optional[int] = None
     currency: Optional[str] = "INR"
-    availability: AvailabilityEnum
+    availability: Optional[AvailabilityEnum] = AvailabilityEnum.in_stock
     status: Optional[str] = "PENDING"
     observed_at: Optional[datetime] = None
-    last_checked: Optional[datetime]
-    created_at: datetime
+    last_checked: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+
+    @validator("availability", pre=True, always=True)
+    def default_availability(cls, v):
+        return v or AvailabilityEnum.in_stock
 
     class Config:
         from_attributes = True
@@ -160,6 +172,28 @@ class ProductPendingResponse(BaseModel):
     message: str
 
 
+class TrackedProductAlertOut(BaseModel):
+    id: int
+    user_id: int
+    product_id: int
+    alert_type: AlertTypeEnum
+    target_price: Optional[float] = None
+    minimum_price: Optional[float] = None
+    maximum_price: Optional[float] = None
+    percentage_drop: Optional[float] = None
+    base_price: Optional[float] = None
+    alert_status: AlertStatusEnum
+    notify_email: bool = True
+    notify_push: bool = True
+    notify_sms: bool = False
+    notify_in_app: bool = True
+    last_triggered_at: Optional[datetime] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 class TrackedProductOut(BaseModel):
     id: int
     user_id: int
@@ -171,6 +205,7 @@ class TrackedProductOut(BaseModel):
     created_at: datetime
     tracked_at: Optional[datetime] = None
     product: ProductOut
+    alert: Optional[TrackedProductAlertOut] = None
 
     class Config:
         from_attributes = True

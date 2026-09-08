@@ -180,7 +180,7 @@ def map_product_to_out(product: models.Product) -> ProductOut:
         rating_count=product.rating_count,
         review_count=product.review_count,
         currency=product.currency or "INR",
-        availability=product.availability,
+        availability=product.availability or models.AvailabilityEnum.in_stock,
         status=getattr(product, "status", "PENDING") or "PENDING",
         observed_at=getattr(product, "observed_at", None) or product.last_checked,
         last_checked=product.last_checked,
@@ -563,35 +563,57 @@ async def add_product(
 
     if existing_product:
         product = existing_product
-        if payload.product_name and not product.product_name:
+        if payload.product_name and (not product.product_name or product.product_name.startswith("Fetching")):
             product.product_name = payload.product_name
             product.title = payload.product_name
         if payload.current_price and not product.current_price:
             product.current_price = payload.current_price
-        # If product already has pricing, return HTTP 200 OK
-        if product.current_price is not None and product.status == "ACTIVE":
+        if payload.original_price and not product.original_price:
+            product.original_price = payload.original_price
+        if payload.discount_percentage and not product.discount_percentage:
+            product.discount_percentage = payload.discount_percentage
+        img = payload.product_image or payload.image_url
+        if img and not product.product_image:
+            product.product_image = img
+            product.image_url = img
+        if payload.rating and not product.rating:
+            product.rating = payload.rating
+        if payload.rating_count and not product.rating_count:
+            product.rating_count = payload.rating_count
+        if payload.brand and not product.brand:
+            product.brand = payload.brand
+        if product.current_price is not None and product.status != "ACTIVE":
+            product.status = "ACTIVE"
+            product.availability = models.AvailabilityEnum.in_stock
+        db.commit()
+        db.refresh(product)
+        if product.current_price is not None:
             response.status_code = status.HTTP_200_OK
     else:
         is_new = True
         placeholder_title = payload.product_name or f"Fetching {store_name.capitalize()} Product Details..."
+        img = payload.product_image or payload.image_url
+        is_active_initial = bool(payload.product_name and payload.current_price and img)
         product = models.Product(
             platform=platform,
             store=store_name,
             external_product_id=ext_id,
             canonical_id=ext_id,
-            product_name=placeholder_title,
-            title=placeholder_title,
+            product_name=payload.product_name or placeholder_title,
+            title=payload.product_name or placeholder_title,
             product_url=canonical_url,
             canonical_url=canonical_url,
-            product_image=None,
-            image_url=None,
-            brand=None,
+            product_image=img,
+            image_url=img,
+            brand=payload.brand,
             variant=None,
             current_price=payload.current_price,
-            original_price=None,
-            discount_percentage=None,
-            availability=models.AvailabilityEnum.unknown,
-            status="PENDING",
+            original_price=payload.original_price,
+            discount_percentage=payload.discount_percentage,
+            rating=payload.rating,
+            rating_count=payload.rating_count,
+            availability=models.AvailabilityEnum.in_stock if is_active_initial else models.AvailabilityEnum.unknown,
+            status="ACTIVE" if is_active_initial else "PENDING",
             history_state="ORGANIC_COLD_START",
             created_at=now,
             updated_at=now,
@@ -599,9 +621,11 @@ async def add_product(
         db.add(product)
         db.commit()
         db.refresh(product)
+        if is_active_initial:
+            response.status_code = status.HTTP_200_OK
 
     # 2b. Synchronous fast fetch if product details are missing or pending
-    if is_new or product.status == "PENDING" or product.current_price is None or (product.product_name and product.product_name.startswith("Fetching")):
+    if (is_new or product.status == "PENDING" or product.current_price is None or (product.product_name and product.product_name.startswith("Fetching"))) and not (product.current_price is not None and product.product_image and product.status == "ACTIVE"):
         try:
             live_data = await async_fetch_product_data(canonical_url)
             if live_data.success and live_data.product_name:
@@ -683,9 +707,37 @@ async def add_product(
         except Exception as exc:
             logger.warning(f"Could not dispatch via Celery broker: {exc}. Starting asynchronous fallback thread.")
             import threading
+            # BUG-002 FIX: Call the Celery task's underlying function directly (not the task wrapper).
+            # The old code passed `None` as first arg (mimicking Celery's `self`), which shifted
+            # all subsequent args — product_id ended up in the canonical_url slot.
+            from worker.tasks import perform_product_price_check
+            def _fallback_ingest(pid, curl, platform, cid):
+                try:
+                    import asyncio
+                    from services.history_fetcher import HistoricalAggregatorService
+                    from db.db_ops import bulk_insert_history, recalculate_product_metrics
+                    from db.database import SessionLocal
+                    db_sess = SessionLocal()
+                    try:
+                        prod_obj = db_sess.query(models.Product).filter(models.Product.id == pid).first()
+                        if prod_obj:
+                            hist_points = asyncio.run(HistoricalAggregatorService.fetch_history(platform, curl, cid))
+                            if hist_points:
+                                asyncio.run(bulk_insert_history(db_sess, pid, hist_points, is_backfilled=True, store=platform))
+                                prod_obj.history_state = "AGGREGATED_2YR"
+                            else:
+                                prod_obj.history_state = "ORGANIC_COLD_START"
+                            prod_obj.status = "ACTIVE"
+                            prod_obj.last_checked = datetime.utcnow()
+                            db_sess.commit()
+                            asyncio.run(recalculate_product_metrics(db_sess, pid))
+                    finally:
+                        db_sess.close()
+                except Exception as thread_exc:
+                    logger.warning(f"Fallback ingest thread failed for Product {pid}: {thread_exc}")
             threading.Thread(
-                target=ingest_product_pipeline,
-                args=(None, product.id, canonical_url, store_name, ext_id or ""),
+                target=_fallback_ingest,
+                args=(product.id, canonical_url, store_name, ext_id or ""),
                 daemon=True
             ).start()
 
@@ -726,7 +778,40 @@ def list_my_products(
     response.headers["X-Total-Count"] = str(total)
 
     # Rule: Database MUST control sorting - created_at DESC
-    return query.order_by(models.UserTrackedProduct.created_at.desc()).offset(skip).limit(limit).all()
+    trackers = query.order_by(models.UserTrackedProduct.created_at.desc()).offset(skip).limit(limit).all()
+
+    # Efficiently load active alerts for these products
+    product_ids = [t.product_id for t in trackers]
+    alerts_map = {}
+    if product_ids:
+        user_alerts = db.query(models.PriceAlert).filter(
+            models.PriceAlert.user_id == current_user.id,
+            models.PriceAlert.product_id.in_(product_ids),
+            models.PriceAlert.alert_status != models.AlertStatusEnum.disabled,
+        ).all()
+        for a in user_alerts:
+            alerts_map[a.product_id] = a
+
+    out_list = []
+    for t in trackers:
+        prod_out = map_product_to_out(t.product)
+        alert_obj = alerts_map.get(t.product_id)
+        out_list.append(
+            TrackedProductOut(
+                id=t.id,
+                user_id=t.user_id,
+                product_id=t.product_id,
+                tracking_status=t.tracking_status,
+                target_min_price=t.target_min_price,
+                target_max_price=t.target_max_price,
+                notes=t.notes,
+                created_at=t.created_at,
+                tracked_at=t.created_at,
+                product=prod_out,
+                alert=alert_obj,
+            )
+        )
+    return out_list
 
 
 @router.get("/{tracker_id}", response_model=TrackedProductOut)
@@ -741,7 +826,27 @@ def get_product(
     ).first()
     if not tracker:
         raise HTTPException(status_code=404, detail="Tracked product not found")
-    return tracker
+    
+    prod_out = map_product_to_out(tracker.product)
+    user_alert = db.query(models.PriceAlert).filter(
+        models.PriceAlert.user_id == current_user.id,
+        models.PriceAlert.product_id == tracker.product_id,
+        models.PriceAlert.alert_status != models.AlertStatusEnum.disabled,
+    ).first()
+
+    return TrackedProductOut(
+        id=tracker.id,
+        user_id=tracker.user_id,
+        product_id=tracker.product_id,
+        tracking_status=tracker.tracking_status,
+        target_min_price=tracker.target_min_price,
+        target_max_price=tracker.target_max_price,
+        notes=tracker.notes,
+        created_at=tracker.created_at,
+        tracked_at=tracker.created_at,
+        product=prod_out,
+        alert=user_alert,
+    )
 
 
 @router.put("/{tracker_id}", response_model=TrackedProductOut)
@@ -870,18 +975,8 @@ async def get_product_detail(
         ).first()
 
     if not tracker:
-        product_obj = db.query(models.Product).filter(models.Product.id == tracker_id).first()
-        if product_obj:
-            tracker = models.UserTrackedProduct(
-                user_id=current_user.id,
-                product_id=product_obj.id,
-                tracking_status=models.TrackingStatusEnum.active,
-            )
-            db.add(tracker)
-            db.commit()
-            db.refresh(tracker)
-
-    if not tracker:
+        # BUG-008 FIX: Do NOT silently auto-enroll the user as tracking a product they never tracked.
+        # Return 404 so the caller can decide whether to explicitly request tracking.
         raise HTTPException(status_code=404, detail="Tracked product not found")
 
     product = tracker.product
@@ -1142,6 +1237,23 @@ def set_product_alert_direct(
     db.commit()
     db.refresh(alert)
     return alert
+
+
+@router.delete("/{product_id}/alert", status_code=status.HTTP_204_NO_CONTENT)
+def delete_product_alert_direct(
+    product_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Delete a price drop alert for a product."""
+    alert = db.query(models.PriceAlert).filter(
+        models.PriceAlert.user_id == current_user.id,
+        models.PriceAlert.product_id == product_id,
+    ).first()
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    db.delete(alert)
+    db.commit()
 
 
 @router.get("/{product_id}", response_model=ProductOut)

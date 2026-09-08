@@ -32,11 +32,11 @@ interface ThemeContextType {
 }
 
 const defaultSettings: ThemeSettings = {
-  heroTheme: 'festive',
+  heroTheme: 'cyber',
   customImageUrl: '',
   bannerBrightness: 85,
   showOrnaments: true,
-  accentColor: '#6366f1',
+  accentColor: '#06b6d4',
 };
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -53,16 +53,6 @@ export interface ThemePresetDetails {
 }
 
 export const THEME_PRESETS: Record<HeroTheme, ThemePresetDetails> = {
-  festive: {
-    name: 'Festive Royal Gold & Plum',
-    description: 'Traditional Indian festive celebration with golden mandalas, diya lamps, and rich burgundy plum tones',
-    badge: '🎆 Festive Theme',
-    bannerUrl: '/hero-festive.jpg',
-    gradient: 'linear-gradient(135deg, #4a044e 0%, #701a75 40%, #831843 70%, #3b0764 100%)',
-    overlayGradient: 'linear-gradient(to bottom, rgba(0,0,0,0.35) 0%, rgba(59,7,100,0.5) 50%, rgba(36,0,29,0.95) 100%)',
-    bgBase: '#24001d',
-    accent: '#f59e0b',
-  },
   cyber: {
     name: 'Midnight Cyber Sapphire',
     description: 'Futuristic dark indigo mesh grid with neon cyan & sapphire floating holograms',
@@ -72,6 +62,16 @@ export const THEME_PRESETS: Record<HeroTheme, ThemePresetDetails> = {
     overlayGradient: 'linear-gradient(to bottom, rgba(0,0,0,0.4) 0%, rgba(15,23,42,0.6) 50%, rgba(11,15,25,0.95) 100%)',
     bgBase: '#0b0f19',
     accent: '#06b6d4',
+  },
+  festive: {
+    name: 'Festive Royal Gold & Plum',
+    description: 'Traditional Indian festive celebration with golden mandalas, diya lamps, and rich burgundy plum tones',
+    badge: '🎆 Festive Theme',
+    bannerUrl: '/hero-festive.jpg',
+    gradient: 'linear-gradient(135deg, #4a044e 0%, #701a75 40%, #831843 70%, #3b0764 100%)',
+    overlayGradient: 'linear-gradient(to bottom, rgba(0,0,0,0.35) 0%, rgba(59,7,100,0.5) 50%, rgba(36,0,29,0.95) 100%)',
+    bgBase: '#24001d',
+    accent: '#f59e0b',
   },
   crimson: {
     name: 'Imperial Velvet Crimson',
@@ -169,7 +169,14 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [settings, setSettings] = useState<ThemeSettings>(() => {
     try {
       const saved = localStorage.getItem('priceping_theme_settings');
-      return saved ? { ...defaultSettings, ...JSON.parse(saved) } : defaultSettings;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (!parsed.heroTheme || parsed.heroTheme === 'festive') {
+          return { ...defaultSettings, ...parsed, heroTheme: 'cyber', accentColor: '#06b6d4' };
+        }
+        return { ...defaultSettings, ...parsed };
+      }
+      return defaultSettings;
     } catch {
       return defaultSettings;
     }

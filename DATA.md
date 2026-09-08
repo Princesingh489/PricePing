@@ -227,6 +227,18 @@ $$Q = \frac{\text{current\_price} - P_{\text{lowest}}}{P_{\text{highest}} - P_{\
 | 🔴 **WAIT** | $Q > 0.65$ or near $P_{\text{highest}}$ | Inflated price. Likely to drop in the next cycle. |
 | ⚪ **INSUFFICIENT DATA** | $n < 1$ verified points | Display clean `—` dashes instead of synthetic or false values. |
 
+### 4. Alert Distance-to-Target & Telemetry Gap Mathematics
+In the automated price alert engine and high-density telemetry dashboard (`Alerts.tsx`), the delta between the current selling price $P_{\text{current}}$ and the user's target threshold $P_{\text{target}}$ is calculated as:
+
+$$\Delta_{\text{price}} = P_{\text{current}} - P_{\text{target}}$$
+$$\Delta_{\%} = \frac{P_{\text{current}} - P_{\text{target}}}{P_{\text{current}}} \times 100$$
+
+- **Trigger Invariant**: When $\Delta_{\text{price}} \le 0$ ($P_{\text{current}} \le P_{\text{target}}$), the alert transitions to `is_triggered = true`. The Celery notification task dispatches multi-channel alerts (In-App, SMTP Email, or SMS).
+- **Proximity Progression**: When $\Delta_{\text{price}} > 0$, the UI displays an intuitive color-transitioned progress indicator:
+  - 🟢 **Within 5% of Target**: Near trigger threshold (Amber/Green).
+  - 🟡 **Within 15% of Target**: Approaching target price window.
+  - 🟣 **Above 15% of Target**: Tracking active, awaiting seasonal sale price drops.
+
 ---
 
 ## 🛡️ Cold-Start Handling & Data State Machine
