@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_SECRET: str = ""
 
     # CORS
-    BACKEND_CORS_ORIGINS: str = '["http://localhost:3000","http://localhost:5173","https://pingprice.store","https://www.pingprice.store","http://pingprice.store"]'
+    BACKEND_CORS_ORIGINS: str = '["http://localhost:3000","http://localhost:5173","https://priceping.store","https://www.priceping.store","http://priceping.store","https://pingprice.store","https://www.pingprice.store"]'
 
     @property
     def cors_origins(self) -> List[str]:
