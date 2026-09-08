@@ -45,6 +45,8 @@ export const authApi = {
     api.post('/api/auth/change-password', { old_password, new_password }),
   forgotPassword: (email: string) =>
     api.post('/api/auth/forgot-password', { email }),
+  googleAuth: (data: { code?: string; redirect_uri?: string; credential?: string }) =>
+    api.post('/api/auth/google', data),
 };
 
 // ---- Products ----

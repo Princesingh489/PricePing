@@ -19,6 +19,7 @@ import PriceHistoryPage from './pages/PriceHistoryPage';
 import Settings from './pages/Settings';
 import AdminPanel from './pages/AdminPanel';
 import ProductDetailPage from './pages/ProductDetailPage';
+import GoogleCallback from './pages/GoogleCallback';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -48,6 +49,7 @@ function AppRoutes() {
       <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <Login />} />
       <Route path="/register" element={user ? <Navigate to="/dashboard" /> : <Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/auth/google/callback" element={<GoogleCallback />} />
 
       {/* Main Home / Landing Route */}
       <Route

@@ -71,6 +71,12 @@ class ResetPassword(BaseModel):
         return v
 
 
+class GoogleAuthRequest(BaseModel):
+    code: Optional[str] = None
+    redirect_uri: Optional[str] = None
+    credential: Optional[str] = None
+
+
 # ---- Product Schemas ----
 
 class ProductCreate(BaseModel):
