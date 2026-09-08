@@ -56,7 +56,7 @@ export default function Register() {
       await authApi.register(form);
       await login(form.email, form.password);
       toast.success('Welcome to PricePing! 🎉');
-      navigate('/dashboard');
+      navigate('/');
     } catch (err: any) {
       toast.error(err.response?.data?.detail || 'Registration failed. Please try again.');
     } finally {

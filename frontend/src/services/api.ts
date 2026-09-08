@@ -16,15 +16,19 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Handle 401 globally - redirect to login (except on login/register endpoints)
+// Handle 401 globally - redirect to login only for authenticated sessions on protected routes
 api.interceptors.response.use(
   (res) => res,
   (err) => {
     const url = err.config?.url || '';
+    const token = localStorage.getItem('token');
+    const isPublicPage = ['/', '/terms', '/privacy'].includes(window.location.pathname);
     if (err.response?.status === 401 && !url.includes('/login') && !url.includes('/register')) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      window.location.href = '/login';
+      if (token && !isPublicPage) {
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(err);
   }

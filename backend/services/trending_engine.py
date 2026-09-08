@@ -594,13 +594,20 @@ class TrendingEngine:
     evaluates candidates via DealValidator, ranks them via DealEngine, and serves cached results.
     """
 
+    _redis_failed: bool = False
+
     @classmethod
     def _get_redis_client(cls):
+        if cls._redis_failed:
+            return None
         try:
             import redis
-            return redis.from_url(settings.REDIS_URL, decode_responses=True, socket_connect_timeout=2)
+            client = redis.from_url(settings.REDIS_URL, decode_responses=True, socket_connect_timeout=0.5, socket_timeout=0.5)
+            client.ping()
+            return client
         except Exception as e:
-            logger.debug(f"Redis connection not available: {e}")
+            logger.info(f"Redis not reachable ({e}). Using ultra-fast in-memory cache.")
+            cls._redis_failed = True
             return None
 
     @classmethod

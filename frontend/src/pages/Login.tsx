@@ -33,7 +33,7 @@ export default function Login() {
   const [errorMsg, setErrorMsg] = useState("");
 
   const emailRef = useRef<HTMLInputElement>(null);
-  const from = (location.state as any)?.from?.pathname || "/dashboard";
+  const from = (location.state as any)?.from?.pathname || "/";
 
   const emailError =
     emailTouched && email.length > 0 && !isValidEmail(email)

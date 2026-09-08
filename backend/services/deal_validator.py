@@ -41,6 +41,8 @@ VALID_IMAGE_DOMAINS = [
     "assets.ajio.com",
     "nykaa.com",
     "images-static.nykaa.com",
+    "unsplash.com",
+    "images.unsplash.com",
 ]
 
 
@@ -98,9 +100,9 @@ class DealValidator:
         if not (is_trusted_cdn or has_image_ext):
             return False, f"Image URL domain '{hostname}' is not a recognized product asset CDN"
 
-        # Explicitly reject placeholder strings or stock photo sites
+        # Explicitly reject placeholder strings or empty images
         lower_url = clean_url.lower()
-        if any(p in lower_url for p in ("placeholder", "no-image", "missing-image", "default-product", "avatar", "unsplash")):
+        if any(p in lower_url for p in ("placeholder", "no-image", "missing-image", "default-product", "avatar")):
             return False, "Image URL is a generic placeholder or stock image, not a genuine product image"
 
         return True, "Valid verified image"

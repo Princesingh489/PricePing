@@ -41,7 +41,7 @@ export default function GoogleCallback() {
     loginWithGoogle(code, redirectUri)
       .then(() => {
         toast.success('Signed in with Google successfully! 👋');
-        navigate('/dashboard', { replace: true });
+        navigate('/', { replace: true });
       })
       .catch((err: any) => {
         const detail =

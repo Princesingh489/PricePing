@@ -46,8 +46,8 @@ function AppRoutes() {
 
   return (
     <Routes>
-      <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <Login />} />
-      <Route path="/register" element={user ? <Navigate to="/dashboard" /> : <Register />} />
+      <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
+      <Route path="/register" element={user ? <Navigate to="/" /> : <Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/auth/google/callback" element={<GoogleCallback />} />
 

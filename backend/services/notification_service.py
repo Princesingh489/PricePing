@@ -136,7 +136,7 @@ def build_price_alert_email(
     <body>
     <div class="container">
         <div class="header">
-            <h1>🔔 PriceWatch India</h1>
+            <h1>🔔 PricePing</h1>
             <p>Your price alert has been triggered!</p>
         </div>
         <div class="content">
@@ -148,12 +148,17 @@ def build_price_alert_email(
                 {'<div class="original">MRP: ' + formatted_original + '</div>' if original_price else ''}
             </div>
             <p style="text-align:center">
-                <a class="btn" href="{product_url}" target="_blank">🛒 Buy Now</a>
+                <a class="btn" href="{product_url}" target="_blank">🛒 Buy Now on {platform.title()}</a>
             </p>
-            <p style="color:#888;font-size:12px;">Prices change frequently. Hurry before this deal ends!</p>
+            <p style="text-align:center; margin-top: 12px;">
+                <a href="https://priceping.store" target="_blank" style="color:#667eea; font-weight:600; font-size:13px; text-decoration:none;">
+                    🔍 Track &amp; Compare Live Deals on PricePing Home →
+                </a>
+            </p>
+            <p style="color:#888;font-size:12px; text-align:center; margin-top:16px;">Prices change frequently. Hurry before this deal ends!</p>
         </div>
         <div class="footer">
-            <p>© 2024 PriceWatch India. You received this because you set up a price alert.</p>
+            <p>© 2026 PricePing Technologies (<a href="https://priceping.store" style="color:#888;">priceping.store</a>). You received this because you set up a price alert.</p>
         </div>
     </div>
     </body></html>
@@ -167,7 +172,9 @@ Current Price: {formatted_price}
 Original Price: {formatted_original}
 Buy Now: {product_url}
 
-PriceWatch India
+Track & Compare on PricePing: https://priceping.store
+
+PricePing Technologies
     """
     return subject, html
 

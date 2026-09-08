@@ -130,15 +130,15 @@ export default function FloatingChatAssistant() {
       {/* Floating Chat Launcher Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white flex items-center justify-center shadow-2xl shadow-indigo-600/50 hover:scale-110 active:scale-95 transition-all duration-300 group cursor-pointer"
+        className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-40 w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white flex items-center justify-center shadow-2xl shadow-indigo-600/50 hover:scale-110 active:scale-95 transition-all duration-300 group cursor-pointer"
         title="PricePing Assistant – Live Deal & Price Drop Radar"
         id="priceping-assistant-toggle-btn"
       >
         {isOpen ? (
-          <X className="w-6 h-6" />
+          <X className="w-5 h-5 sm:w-6 sm:h-6" />
         ) : (
           <div className="relative flex items-center justify-center">
-            <Bot className="w-6 h-6" />
+            <Bot className="w-5 h-5 sm:w-6 sm:h-6" />
             <span className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-400 rounded-full border-2 border-[#121626] animate-pulse" />
           </div>
         )}
@@ -149,8 +149,8 @@ export default function FloatingChatAssistant() {
         <div
           className={`fixed z-50 bg-[#0f1322] border border-indigo-500/20 rounded-3xl shadow-2xl shadow-black/80 flex flex-col overflow-hidden transition-all duration-300 animate-slide-in ${
             isExpanded
-              ? 'bottom-4 right-4 sm:right-6 w-[95vw] sm:w-[540px] h-[85vh] max-h-[760px]'
-              : 'bottom-24 right-4 sm:right-6 w-[92vw] sm:w-[420px] h-[580px] max-h-[620px]'
+              ? 'bottom-20 sm:bottom-4 right-2 sm:right-6 w-[95vw] sm:w-[540px] h-[75vh] sm:h-[85vh] max-h-[760px]'
+              : 'bottom-20 sm:bottom-24 right-2 sm:right-6 w-[95vw] sm:w-[420px] h-[520px] sm:h-[580px] max-h-[620px]'
           }`}
           id="priceping-assistant-container"
         >
