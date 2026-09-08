@@ -1,7 +1,6 @@
-﻿import React, { useState } from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { authApi } from "../services/api";
-import toast from "react-hot-toast";
 import { Mail, ArrowLeft, Loader2, CheckCircle2, ShieldCheck } from "lucide-react";
 
 function isValidEmail(v: string) {
