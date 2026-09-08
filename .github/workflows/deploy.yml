@@ -39,6 +39,9 @@ jobs:
     name: Deploy to Netlify
     needs: validate-and-build
     runs-on: ubuntu-latest
+    env:
+      NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+      NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -50,10 +53,7 @@ jobs:
           path: frontend/dist
 
       - name: Deploy to Netlify
-        if: env.NETLIFY_AUTH_TOKEN != '' && env.NETLIFY_SITE_ID != ''
-        env:
-          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        if: ${{ env.NETLIFY_AUTH_TOKEN != '' && env.NETLIFY_SITE_ID != '' }}
         run: |
           npx netlify-cli deploy --prod --dir=frontend/dist
 
@@ -61,13 +61,13 @@ jobs:
     name: Deploy to AWS EC2
     needs: validate-and-build
     runs-on: ubuntu-latest
+    env:
+      EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+      EC2_HOST: ${{ secrets.EC2_HOST || '65.0.199.91' }}
+      EC2_USER: ${{ secrets.EC2_USER || 'ubuntu' }}
     steps:
       - name: Deploy Backend Stack via SSH
-        if: env.EC2_SSH_KEY != ''
-        env:
-          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
-          EC2_HOST: ${{ secrets.EC2_HOST || '65.0.199.91' }}
-          EC2_USER: ${{ secrets.EC2_USER || 'ubuntu' }}
+        if: ${{ env.EC2_SSH_KEY != '' }}
         run: |
           mkdir -p ~/.ssh
           echo "$EC2_SSH_KEY" > ~/.ssh/id_rsa
