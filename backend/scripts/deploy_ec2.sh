@@ -23,10 +23,10 @@ git fetch origin main
 git reset --hard origin/main
 
 echo "🐳 2. Verifying Docker & Docker Compose..."
-if command -v docker-compose &> /dev/null; then
-  COMPOSE_CMD="docker-compose"
-elif docker compose version &> /dev/null; then
+if docker compose version &> /dev/null; then
   COMPOSE_CMD="docker compose"
+elif command -v docker-compose &> /dev/null; then
+  COMPOSE_CMD="docker-compose"
 else
   echo "❌ Error: docker-compose not found on this machine."
   exit 1
