@@ -154,7 +154,7 @@ class AmazonAdapter(BaseEcommerceAdapter):
                     # If size is not explicit in search card title, verify candidate product page
                     if not c_size:
                         try:
-                            cand_prod = await self._scraper.extract_product(cand_url)
+                            cand_prod = await self._scraper.extract_product(cand_url, allow_browser=False)
                             if cand_prod.success and cand_prod.variants:
                                 variants_list = cand_prod.variants
                                 matched_sz = next((v for v in cand_prod.variants if normalize_size(v.get("size")) == normalize_size(b_size)), None)

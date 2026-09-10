@@ -43,20 +43,47 @@ class ECommerceURLNormalizer:
         - Preserves variant parameters like th=1 / psc=1 to enforce exact size/color selection.
         - Canonical format: https://www.amazon.in/dp/{ASIN}?th=1&psc=1
         """
-        parsed = urlparse(url.strip())
-        netloc = "www.amazon.in" if "amazon" in parsed.netloc.lower() else parsed.netloc
+        raw = url.strip()
+        if not raw.startswith(("http://", "https://")):
+            raw = "https://" + raw
+        parsed = urlparse(raw)
+        netloc = "www.amazon.in" if ("amazon" in parsed.netloc.lower() or "amzn" in parsed.netloc.lower()) else parsed.netloc
 
-        # Extract ASIN from path patterns: /dp/B0..., /gp/product/B0..., /gp/aw/d/B0...
-        asin_match = re.search(r'/(?:dp|gp/product|gp/aw/d|product)/([A-Z0-9]{10})', parsed.path, re.IGNORECASE)
+        # Extract ASIN from path patterns: /dp/B0..., /gp/product/B0..., /gp/aw/d/B0..., /d/B0...
+        asin_match = re.search(r'/(?:dp|gp/product|gp/aw/d|product|d)/([A-Z0-9]{10})', parsed.path, re.IGNORECASE)
         asin = asin_match.group(1).upper() if asin_match else None
+
+        # General ASIN match fallback from path (e.g. /B0BF57RN3K)
+        if not asin:
+            gen_match = re.search(r'/(B0[A-Z0-9]{8})(?:[/?]|$)', parsed.path, re.IGNORECASE)
+            if gen_match:
+                asin = gen_match.group(1).upper()
 
         # Check query parameters as fallback (e.g. ?asin=...)
         query_params = parse_qs(parsed.query)
         if not asin and "asin" in query_params:
             asin = query_params["asin"][0].upper()
 
+        # Shortlink fallback (e.g. amzn.in/d/xyz or amzn.to/xyz)
+        if not asin and ("amzn.in" in parsed.netloc.lower() or "amzn.to" in parsed.netloc.lower() or "a.co" in parsed.netloc.lower()):
+            short_code = parsed.path.strip("/").split("/")[-1]
+            return NormalizedURLResult(
+                canonical_url=raw,
+                platform="amazon",
+                product_id=short_code or "amazon_item",
+                variant_id=short_code or "amazon_item",
+                original_url=url,
+            )
+
         if not asin:
-            raise ValueError(f"Could not identify a valid Amazon ASIN from URL: {url}")
+            clean_path = parsed.path
+            return NormalizedURLResult(
+                canonical_url=urlunparse(("https", "www.amazon.in", clean_path, "", "", "")),
+                platform="amazon",
+                product_id=clean_path.strip("/").split("/")[-1] or "amazon_item",
+                variant_id=clean_path.strip("/").split("/")[-1] or "amazon_item",
+                original_url=url,
+            )
 
         # Preserve variation flags to enforce exact selected variant
         kept_params = {}
@@ -90,13 +117,16 @@ class ECommerceURLNormalizer:
         - Strips tracking while preserving `pid` and optional `lid`.
         - Canonical format: https://www.flipkart.com{slug_path}?pid={PID}
         """
-        parsed = urlparse(url.strip())
+        raw = url.strip()
+        if not raw.startswith(("http://", "https://")):
+            raw = "https://" + raw
+        parsed = urlparse(raw)
         query_params = parse_qs(parsed.query)
 
         # 1. Extract PID (e.g., MOBFWBYZ8GAJ9F7F)
         pid = query_params.get("pid", [None])[0]
         if not pid:
-            pid_match = re.search(r'[?&]pid=([A-Za-z0-9_-]+)', url)
+            pid_match = re.search(r'[?&]pid=([A-Za-z0-9_-]+)', raw)
             if pid_match:
                 pid = pid_match.group(1)
 
@@ -108,11 +138,13 @@ class ECommerceURLNormalizer:
             kept_params["pid"] = pid
         else:
             # Check for itm ID in path if PID query is missing
-            itm_match = re.search(r'/p/(itm[a-zA-Z0-9]+)', clean_path)
-            if not itm_match:
-                raise ValueError(f"Cannot identify Flipkart product or variant PID from URL: {url}")
-            pid = itm_match.group(1)
-            kept_params["pid"] = pid
+            itm_match = re.search(r'/p/([a-zA-Z0-9_-]+)', clean_path)
+            if itm_match:
+                pid = itm_match.group(1)
+                kept_params["pid"] = pid
+            else:
+                pid = clean_path.strip("/").split("/")[-1] or "flipkart_item"
+                kept_params["pid"] = pid
 
         if "lid" in query_params:
             kept_params["lid"] = query_params["lid"][0]
@@ -135,7 +167,10 @@ class ECommerceURLNormalizer:
         - Preserves variant parameters: `size` and `skuId`.
         - Canonical format: https://www.myntra.com/{path}/buy?size={size}&skuId={skuId}
         """
-        parsed = urlparse(url.strip())
+        raw = url.strip()
+        if not raw.startswith(("http://", "https://")):
+            raw = "https://" + raw
+        parsed = urlparse(raw)
         path = parsed.path
 
         # Extract numeric Style ID from path
@@ -143,13 +178,14 @@ class ECommerceURLNormalizer:
         if not style_match:
             style_match = re.search(r'/(\d{5,12})', path)
 
-        if not style_match:
-            raise ValueError(f"Could not identify a valid Myntra Style ID from URL: {url}")
-
-        style_id = style_match.group(1)
+        style_id = style_match.group(1) if style_match else (path.strip("/").split("/")[-1] or "myntra_item")
 
         # Standardize path ending with /buy
-        base_path = re.sub(r'/\d{5,12}(?:/buy)?/?$', f'/{style_id}/buy', path)
+        if style_match:
+            base_path = re.sub(r'/\d{5,12}(?:/buy)?/?$', f'/{style_id}/buy', path)
+        else:
+            base_path = path
+
         if not base_path.startswith('/'):
             base_path = f'/{base_path}'
 
@@ -177,9 +213,12 @@ class ECommerceURLNormalizer:
         AJIO normalizer:
         - Extracts product code (e.g. /p/469034293_blue)
         """
-        parsed = urlparse(url.strip())
+        raw = url.strip()
+        if not raw.startswith(("http://", "https://")):
+            raw = "https://" + raw
+        parsed = urlparse(raw)
         code_match = re.search(r'/p/([a-zA-Z0-9_-]+)', parsed.path)
-        code = code_match.group(1) if code_match else None
+        code = code_match.group(1) if code_match else (parsed.path.strip("/").split("/")[-1] or "ajio_item")
         clean_path = parsed.path
         canonical_url = urlunparse(("https", "www.ajio.com", clean_path, "", "", ""))
         return NormalizedURLResult(
@@ -196,13 +235,26 @@ class ECommerceURLNormalizer:
         Nykaa normalizer:
         - Extracts SKU / product ID from query parameter `skuId` or path
         """
-        parsed = urlparse(url.strip())
+        raw = url.strip()
+        if not raw.startswith(("http://", "https://")):
+            raw = "https://" + raw
+        parsed = urlparse(raw)
         query_params = parse_qs(parsed.query)
         sku_id = query_params.get("skuId", [None])[0]
         clean_path = parsed.path
+
+        # If skuId query param is absent, extract product ID from /p/{id}
+        if not sku_id:
+            p_match = re.search(r'/p/([a-zA-Z0-9_-]+)', clean_path)
+            if p_match:
+                sku_id = p_match.group(1)
+            else:
+                sku_id = clean_path.strip("/").split("/")[-1] or "nykaa_item"
+
         kept_params = {}
-        if sku_id:
-            kept_params["skuId"] = sku_id
+        if "skuId" in query_params:
+            kept_params["skuId"] = query_params["skuId"][0]
+
         canonical_url = urlunparse(("https", "www.nykaa.com", clean_path, "", urlencode(kept_params), ""))
         return NormalizedURLResult(
             canonical_url=canonical_url,
@@ -216,16 +268,20 @@ class ECommerceURLNormalizer:
     def normalize(cls, raw_url: str) -> NormalizedURLResult:
         """
         Dispatcher method: Detects platform and sanitizes URL accordingly.
+        Supports shortlinks (amzn.in, amzn.to, a.co, fkrt.it, ajio.in) and URLs without scheme.
         """
         if not raw_url or not isinstance(raw_url, str):
             raise ValueError("Invalid URL provided")
 
         url = raw_url.strip()
+        if not url.startswith(("http://", "https://")):
+            url = "https://" + url
+
         lower_url = url.lower()
 
-        if "amazon." in lower_url:
+        if "amazon." in lower_url or "amzn.in" in lower_url or "amzn.to" in lower_url or "a.co" in lower_url:
             return cls.normalize_amazon(url)
-        elif "flipkart." in lower_url:
+        elif "flipkart." in lower_url or "fkrt.it" in lower_url or "fkrt.co" in lower_url:
             return cls.normalize_flipkart(url)
         elif "myntra." in lower_url:
             return cls.normalize_myntra(url)

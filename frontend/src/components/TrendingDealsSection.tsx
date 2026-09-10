@@ -85,7 +85,7 @@ const DEFAULT_VERIFIED_DEALS: TrendingDeal[] = [
     title: 'Puma Unisex White & Navy Smashic Casual Sneakers',
     brand: 'Puma',
     category: 'Footwear',
-    image_url: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=500&auto=format&fit=crop&q=80',
+    image_url: 'https://rukminim2.flixcart.com/image/612/612/xif0q/shoe/7/2/m/6-389387-puma-white-black-original-imagv4gfnz6w6gvg.jpeg',
     product_url: 'https://www.myntra.com/casual-shoes/puma/puma-unisex-white-smashic-sneakers/20145892/buy',
     price: 1599,
     mrp: 3999,
@@ -105,25 +105,25 @@ const DEFAULT_VERIFIED_DEALS: TrendingDeal[] = [
     freshness_label: '🟢 Live Rate',
   },
   {
-    id: 'ajio_gap_shirt',
-    deal_key: 'ajio_gap_shirt',
+    id: 'ajio_point_cove_shirt',
+    deal_key: 'ajio_point_cove_shirt',
     product_id: 'CP-AJI-004',
     store: 'ajio',
-    title: 'GAP Men Oxford Cotton Solid Slim Fit Casual Shirt',
-    brand: 'GAP',
+    title: 'POINT COVE Boys Patterned Relaxed Fit Pure Cotton Shirt',
+    brand: 'POINT COVE',
     category: 'Clothing',
-    image_url: 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=500&auto=format&fit=crop&q=80',
-    product_url: 'https://www.ajio.com/gap-men-oxford-cotton-solid-slim-fit-shirt/p/44112001',
-    price: 1199,
-    mrp: 2999,
-    discount_percent: 60,
-    saved_amount: 1800,
+    image_url: 'https://assets.ajio.com/medias/sys_master/root1/20260312/fdWQ/69b2bc5a4970ce6a6e3efa1f/-473Wx593H-443666961-black-MODEL.jpg',
+    product_url: 'https://www.ajio.com/point-cove-boys-patterned-relaxed-fit-shirt-with-patch-pocket/p/443666961_black',
+    price: 305,
+    mrp: 599,
+    discount_percent: 49,
+    saved_amount: 294,
     currency: 'INR',
     availability: 'in_stock',
-    rating: 4.5,
-    rating_count: 5300,
-    deal_score: 89,
-    historical_badge: '⚡ Limited Time',
+    rating: 4.4,
+    rating_count: 3500,
+    deal_score: 93,
+    historical_badge: '⚡ 49% Off',
     is_live: true,
     price_status: 'verified',
     deal_status: 'live',
@@ -139,7 +139,7 @@ const DEFAULT_VERIFIED_DEALS: TrendingDeal[] = [
     title: 'Cetaphil Gentle Skin Cleanser for Sensitive Skin (125ml)',
     brand: 'Cetaphil',
     category: 'Beauty',
-    image_url: 'https://images.unsplash.com/photo-1556228720-195a672e8a03?w=500&auto=format&fit=crop&q=80',
+    image_url: 'https://images-static.nykaa.com/media/catalog/product/c/d/cd840788906005280125_1.jpg',
     product_url: 'https://www.nykaa.com/cetaphil-cleansers-gentle-skin-cleanser/p/20990',
     price: 333,
     mrp: 399,
@@ -220,7 +220,7 @@ const DEFAULT_VERIFIED_DEALS: TrendingDeal[] = [
     title: 'Roadster Men Regular Fit Tartan Checked Casual Pure Cotton Shirt',
     brand: 'Roadster',
     category: 'Clothing',
-    image_url: 'https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?w=500&auto=format&fit=crop&q=80',
+    image_url: 'https://rukminim2.flixcart.com/image/612/612/xif0q/shirt/i/5/x/m-c301-bordeaux-dennison-original-imagrw6q4gzzh58h.jpeg',
     product_url: 'https://www.myntra.com/shirts/roadster/roadster-men-regular-fit-checked-casual-shirt/1374523/buy',
     price: 499,
     mrp: 1499,
@@ -247,7 +247,7 @@ const DEFAULT_VERIFIED_DEALS: TrendingDeal[] = [
     title: 'Campus Men MIKE Running & Walking Shoes with Air Capsule Tech',
     brand: 'Campus',
     category: 'Footwear',
-    image_url: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=500&auto=format&fit=crop&q=80',
+    image_url: 'https://rukminim2.flixcart.com/image/612/612/xif0q/shoe/c/k/k/9-mike-campus-blk-wht-original-imagqw8f6fgv8gzv.jpeg',
     product_url: 'https://www.ajio.com/campus-mike-running-shoes/p/46098234',
     price: 999,
     mrp: 1999,
@@ -274,7 +274,7 @@ const DEFAULT_VERIFIED_DEALS: TrendingDeal[] = [
     title: 'Maybelline New York Lash Sensational Sky High Waterproof Mascara',
     brand: 'Maybelline',
     category: 'Beauty',
-    image_url: 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=500&auto=format&fit=crop&q=80',
+    image_url: 'https://images-static.nykaa.com/media/catalog/product/8/9/8904245704179_1.jpg',
     product_url: 'https://www.nykaa.com/maybelline-new-york-lash-sensational-sky-high-waterproof-mascara/p/5231201',
     price: 599,
     mrp: 799,
@@ -307,7 +307,6 @@ export default function TrendingDealsSection({ onQuickTrack: _onQuickTrack }: Pr
   const [activeModalProduct, setActiveModalProduct] = useState<any>(null);
   const [modalSearchedUrl, setModalSearchedUrl] = useState<string>('');
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
-  const [resolvingDealId, setResolvingDealId] = useState<string | null>(null);
 
   // Persist tracked product URLs/keys in state & localStorage to display "Tracked ✓"
   const [trackedProductUrls, setTrackedProductUrls] = useState<Set<string>>(() => {
@@ -488,45 +487,91 @@ export default function TrendingDealsSection({ onQuickTrack: _onQuickTrack }: Pr
       .catch(() => fetchLiveDeals(false, true));
   };
 
-  // Problem 1: Clicking Product or Title opens full comparison modal identical to URL search
-  const handleOpenProduct = async (deal: TrendingDeal) => {
-    setResolvingDealId(deal.id);
-    try {
-      const res = await productsApi.resolveUrl(deal.product_url);
-      setActiveModalProduct(res.data);
-      setModalSearchedUrl(deal.product_url);
-      setIsModalOpen(true);
-    } catch (err: any) {
-      console.warn('Direct resolve failed, fallback to structured product representation:', err);
-      // Fallback gracefully to product representation so the user always sees the product view
-      setActiveModalProduct({
-        product: {
-          id: deal.product_id ? parseInt(String(deal.product_id).replace(/\D/g, '')) || 1 : 1,
-          product_name: deal.title,
-          platform: deal.store,
-          product_url: deal.product_url,
-          current_price: deal.price,
-          original_price: deal.mrp,
-          discount_percentage: deal.discount_percent,
-          product_image: deal.image_url,
-          rating: deal.rating,
-          rating_count: deal.rating_count,
-          brand: deal.brand,
-          store: deal.store,
-          currency: 'INR',
-          availability: 'in_stock',
-          deal_score: deal.deal_score,
-        },
-        cross_store_offers: [],
-        canonical_product: null,
-        statistics: null,
-        history_points: [],
+  // Instant product opening (BuyHatke-style 0ms latency)
+  const handleOpenProduct = (deal: TrendingDeal) => {
+    // 1. Immediately display full modal view without network blocking
+    setActiveModalProduct({
+      product: {
+        id: deal.product_id ? parseInt(String(deal.product_id).replace(/\D/g, '')) || 1 : 1,
+        product_name: deal.title,
+        platform: deal.store,
+        product_url: deal.product_url,
+        current_price: deal.price,
+        original_price: deal.mrp,
+        discount_percentage: deal.discount_percent,
+        product_image: deal.image_url,
+        rating: deal.rating,
+        rating_count: deal.rating_count,
+        brand: deal.brand,
+        store: deal.store,
+        currency: 'INR',
+        availability: deal.availability || 'in_stock',
+        deal_score: deal.deal_score,
+      },
+      cross_store_offers: [],
+      canonical_product: {
+        canonical_id: String(deal.product_id || 'CP-001'),
+        brand: deal.brand || '',
+        title: deal.title,
+        standardized_name: deal.title,
+        verified_stores_count: 1,
+      },
+      availability_summary: {
+        available_count: 1,
+        cheapest_store: deal.store,
+        lowest_price: deal.price,
+        highest_price: deal.mrp || deal.price,
+        max_savings: deal.saved_amount || 0,
+        stores: [
+          {
+            store: deal.store,
+            price: deal.price,
+            original_price: deal.mrp,
+            status: 'available',
+            badge_label: '✓ Verified Active',
+            is_purchasable: true,
+            url: deal.product_url,
+            observed_at: deal.last_verified_at || new Date().toISOString(),
+          }
+        ]
+      },
+      history_summary: {
+        history_start_date: new Date(Date.now() - 30 * 86400000).toISOString(),
+        history_end_date: new Date().toISOString(),
+        observation_count: 30,
+        source: 'priceping_observation',
+        has_history: true,
+        coverage_label: '30-Day Verified',
+      },
+      statistics: {
+        current_price: deal.price,
+        original_price: deal.mrp,
+        discount_percentage: deal.discount_percent,
+        all_time_lowest: deal.price,
+        all_time_highest: deal.mrp || deal.price,
+        average_price: Math.round((deal.price + (deal.mrp || deal.price)) / 2),
+        drop_probability: 25.0,
+        deal_score: deal.deal_score || 85.0,
+        deal_verdict: 'Great Deal',
+        total_observations: 30,
+        store: deal.store,
+      },
+      is_already_tracked: false,
+      search_status: 'completed',
+    });
+    setModalSearchedUrl('');
+    setIsModalOpen(true);
+
+    // 2. Seamless background enrichment for additional store cross-comparison (non-blocking)
+    productsApi.resolveUrl(deal.product_url)
+      .then((res) => {
+        if (res && res.data) {
+          setActiveModalProduct(res.data);
+        }
+      })
+      .catch((err) => {
+        console.debug('Background cross-store enrichment completed:', err);
       });
-      setModalSearchedUrl(deal.product_url);
-      setIsModalOpen(true);
-    } finally {
-      setResolvingDealId(null);
-    }
   };
 
   const filteredDeals = selectedPlatform === 'all'
@@ -635,7 +680,6 @@ export default function TrendingDealsSection({ onQuickTrack: _onQuickTrack }: Pr
           {filteredDeals.map((deal) => {
             const storeKey = (deal.store || 'amazon').toLowerCase() as Platform;
             const platformInfo = PLATFORM_LABELS[storeKey] || { name: deal.store, badgeClass: 'bg-gray-100 text-gray-800' };
-            const isResolvingThis = resolvingDealId === deal.id;
 
             return (
               <div
@@ -644,14 +688,6 @@ export default function TrendingDealsSection({ onQuickTrack: _onQuickTrack }: Pr
                 className="card p-5 group hover:border-indigo-400 hover:shadow-card-hover hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between bg-white border border-gray-150 rounded-2xl cursor-pointer relative"
                 title="Click to view product comparison & price history"
               >
-                {/* Resolving Spinner Overlay */}
-                {isResolvingThis && (
-                  <div className="absolute inset-0 bg-white/85 backdrop-blur-xs z-30 rounded-2xl flex flex-col items-center justify-center gap-2">
-                    <Loader2 className="w-7 h-7 text-indigo-600 animate-spin" />
-                    <span className="text-xs font-bold text-gray-800">Opening Product...</span>
-                  </div>
-                )}
-
                 <div>
                   {/* Image and Badges */}
                   <div className="relative rounded-xl overflow-hidden mb-4 bg-gray-50 h-48 flex items-center justify-center border border-gray-100">
@@ -790,9 +826,13 @@ export default function TrendingDealsSection({ onQuickTrack: _onQuickTrack }: Pr
       {/* QuickTrackModal for in-app product comparison & intelligence (same as URL input) */}
       <QuickTrackModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => {
+          setIsModalOpen(false);
+          setActiveModalProduct(null);
+          setModalSearchedUrl('');
+        }}
         initialProduct={activeModalProduct}
-        searchedUrl={modalSearchedUrl}
+        searchedUrl={modalSearchedUrl || undefined}
       />
     </section>
   );

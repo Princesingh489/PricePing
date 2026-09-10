@@ -81,6 +81,21 @@ class DealValidator:
 
         return True, "Valid URL"
 
+    DEAD_IMAGE_PATTERNS = [
+        "441115890",
+        "441130456",
+        "8901012117560",
+        "ec8d99c8901526584055",
+        "3499320004039",
+        "806143924716",
+        "imah4h4zzcgz9zgf",
+        "imah4h4zfqykg3gy",
+        "/root/2023",
+        "/root/2022",
+        "/root/2021",
+        "/root/2020",
+    ]
+
     @classmethod
     def validate_image(cls, image_url: str) -> Tuple[bool, str]:
         if not image_url or not isinstance(image_url, str) or len(image_url.strip()) < 10:
@@ -104,6 +119,9 @@ class DealValidator:
         lower_url = clean_url.lower()
         if any(p in lower_url for p in ("placeholder", "no-image", "missing-image", "default-product", "avatar")):
             return False, "Image URL is a generic placeholder or stock image, not a genuine product image"
+
+        if any(p in lower_url for p in cls.DEAD_IMAGE_PATTERNS):
+            return False, "Image URL is expired or unavailable on the remote CDN"
 
         return True, "Valid verified image"
 

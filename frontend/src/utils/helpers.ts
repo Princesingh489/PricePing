@@ -77,11 +77,11 @@ export function getPlatformBadgeClass(platform: Platform): string {
 export function detectPlatform(url: string): Platform {
   if (!url) return 'unknown';
   const l = url.toLowerCase();
-  if (l.includes('amazon.in') || l.includes('amzn.in') || l.includes('amzn.to')) return 'amazon';
-  if (l.includes('flipkart.com') || l.includes('fkrt.it')) return 'flipkart';
-  if (l.includes('ajio.com')) return 'ajio';
-  if (l.includes('myntra.com')) return 'myntra';
-  if (l.includes('nykaa.com')) return 'nykaa';
+  if (l.includes('amazon.') || l.includes('amzn.') || l.includes('amzn.to') || l.includes('a.co')) return 'amazon';
+  if (l.includes('flipkart.') || l.includes('fkrt.it') || l.includes('fkrt.co')) return 'flipkart';
+  if (l.includes('ajio.') || l.includes('ajio.page.link')) return 'ajio';
+  if (l.includes('myntra.')) return 'myntra';
+  if (l.includes('nykaa.')) return 'nykaa';
   return 'unknown';
 }
 

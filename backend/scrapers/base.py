@@ -151,12 +151,12 @@ class BaseScraper(ABC):
             logger.debug(f"Fast HTTP fetch failed for {url}: {e}")
         return None
 
-    async def extract_product(self, url: str, force_fresh: bool = False) -> ExtractionResult:
+    async def extract_product(self, url: str, force_fresh: bool = False, allow_browser: bool = True) -> ExtractionResult:
         """
         Adaptive Extraction Pipeline:
         1. Variant-aware cache check
         2. Fast HTTP extraction (<1s)
-        3. Targeted Playwright browser extraction fallback
+        3. Targeted Playwright browser extraction fallback (if allow_browser is True)
         4. Variant size price synchronization
         """
         product_id = self.extract_product_id(url)
@@ -206,28 +206,29 @@ class BaseScraper(ABC):
                 self._update_cache(res)
                 return res
 
-        # 3. Targeted Extraction via Warm PlaywrightPool / PlaywrightManager
+        # 3. Targeted Extraction via Warm PlaywrightPool / PlaywrightManager (only if allow_browser is True)
         playwright_html = None
-        try:
-            # Check PlaywrightManager first in case it is patched in test environments
-            playwright_html, method = await PlaywrightManager.fetch_html(url, wait_selector=self.wait_selector, timeout_ms=8000)
-        except Exception:
-            playwright_html = None
-
-        if not playwright_html:
+        if allow_browser:
             try:
-                playwright_html, method = await PlaywrightPool.fetch_html(url, wait_selector=self.wait_selector, timeout_ms=8000)
+                # Check PlaywrightManager first in case it is patched in test environments
+                playwright_html, method = await PlaywrightManager.fetch_html(url, wait_selector=self.wait_selector, timeout_ms=8000)
             except Exception:
                 playwright_html = None
 
-        if playwright_html:
-            res = self.extract_from_html(playwright_html, url)
-            res = self.sync_variant_price(res, url)
-            if res.title and res.current_price is not None and res.confidence_score >= 50:
-                self._update_cache(res)
-                return res
-            elif res.title or res.current_price is not None:
-                return res
+            if not playwright_html:
+                try:
+                    playwright_html, method = await PlaywrightPool.fetch_html(url, wait_selector=self.wait_selector, timeout_ms=8000)
+                except Exception:
+                    playwright_html = None
+
+            if playwright_html:
+                res = self.extract_from_html(playwright_html, url)
+                res = self.sync_variant_price(res, url)
+                if res.title and res.current_price is not None and res.confidence_score >= 50:
+                    self._update_cache(res)
+                    return res
+                elif res.title or res.current_price is not None:
+                    return res
 
         # 4. Resilient Fallback to Last Verified Cache if Live Network/Bot Detection Blocked
         if static_cached and static_cached.get("last_known_price") is not None:

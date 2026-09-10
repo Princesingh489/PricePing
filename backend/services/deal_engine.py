@@ -124,7 +124,7 @@ class DealEngine:
                 ids.append(f"url_{clean_url}")
             title = d.get("title") or ""
             if title:
-                clean_title = re.sub(r"[^a-z0-9]", "", title.lower())[:35]
+                clean_title = re.sub(r"[^a-z0-9]", "", title.lower())[:80]
                 if clean_title:
                     ids.append(f"title_{clean_title}")
             d_key = d.get("deal_key") or d.get("id")

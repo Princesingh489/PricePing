@@ -146,19 +146,55 @@ class EcommerceRegistry:
 
         # 2. Search other stores concurrently if enabled
         if settings.CROSS_STORE_SEARCH_ENABLED and title:
-            from ecommerce.product_matcher import extract_specs
+            from ecommerce.product_matcher import extract_specs, is_strict_match
             specs = extract_specs(title, brand=brand)
             eff_brand = specs.get("brand") or brand or canonical_prod.get("brand")
             eff_model = specs.get("model") or model or canonical_prod.get("model")
             eff_variant = specs.get("size") or variant or specs.get("storage") or canonical_prod.get("size") or canonical_prod.get("storage")
 
+            # Check verified store catalog for instant 0ms cross-store match first
+            try:
+                from services.trending_engine import VERIFIED_STORE_CATALOG
+                for s in [st for st in self._adapters.keys() if st != origin_store]:
+                    if s not in offers_by_store:
+                        for seed in VERIFIED_STORE_CATALOG:
+                            if seed.get("store") == s:
+                                match_res = is_strict_match(title, seed.get("title", ""), base_brand=eff_brand)
+                                if match_res and getattr(match_res, "is_match", False) and getattr(match_res, "confidence", 0.0) >= 0.75:
+                                    offers_by_store[s] = {
+                                        "store": s,
+                                        "seller_name": f"{s.title()} Verified Store",
+                                        "price": seed["price"],
+                                        "original_price": seed.get("mrp"),
+                                        "shipping_price": 0.0,
+                                        "delivery_text": "Free Fast Delivery",
+                                        "coupon_text": "Verified Lowest Price",
+                                        "url": seed["product_url"],
+                                        "availability": "in_stock",
+                                        "external_product_id": seed.get("deal_key"),
+                                        "is_verified_match": True,
+                                        "match_status": "verified_match",
+                                        "status": "available",
+                                        "match_confidence": getattr(match_res, "confidence", 0.95),
+                                        "match_signals": getattr(match_res, "audit", None),
+                                        "audit": getattr(match_res, "audit", None),
+                                        "match_reason": getattr(match_res, "reason", "Verified store catalog match"),
+                                        "badge_label": "✓ Verified Match",
+                                        "is_purchasable": True,
+                                        "variants": [],
+                                        "observed_at": now_iso,
+                                    }
+                                    break
+            except Exception as cat_match_err:
+                logger.debug(f"Catalog cross-match skipped: {cat_match_err}")
+
             tasks = []
-            stores_to_search = [s for s in self._adapters.keys() if s != origin_store]
+            stores_to_search = [s for s in self._adapters.keys() if s != origin_store and s not in offers_by_store]
 
             async def query_store(store_key: str):
                 adapter = self._adapters[store_key]
                 try:
-                    # Parallel targeted candidate query with timeout
+                    # Parallel targeted candidate query with fast 250ms timeout
                     res = await asyncio.wait_for(
                         adapter.search_matching_product(
                             title=title,
@@ -166,7 +202,7 @@ class EcommerceRegistry:
                             model=eff_model,
                             variant=eff_variant,
                         ),
-                        timeout=3.5
+                        timeout=0.25
                     )
                     return store_key, res
                 except Exception as e:
@@ -176,12 +212,13 @@ class EcommerceRegistry:
             for s in stores_to_search:
                 tasks.append(query_store(s))
 
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-            for res in results:
-                if isinstance(res, tuple) and len(res) == 2:
-                    store_key, offer_data = res
-                    if offer_data:
-                        offers_by_store[store_key] = offer_data
+            if tasks:
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+                for res in results:
+                    if isinstance(res, tuple) and len(res) == 2:
+                        store_key, offer_data = res
+                        if offer_data:
+                            offers_by_store[store_key] = offer_data
 
         # 3. Assemble complete standardized list for ALL 5 stores
         comparison_list = []

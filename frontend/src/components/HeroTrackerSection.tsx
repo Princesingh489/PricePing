@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { useTheme, THEME_PRESETS } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { productsApi } from '../services/api';
 import toast from 'react-hot-toast';
 import {
-  Search, Sparkles, Mic, Loader2, X
+  Search, Sparkles, Mic, X
 } from 'lucide-react';
 import QuickTrackModal from './QuickTrackModal';
 
@@ -14,43 +13,52 @@ interface Props {
 
 export default function HeroTrackerSection({ onProductTracked }: Props) {
   const { settings } = useTheme();
+  const currentPreset = THEME_PRESETS[settings.heroTheme] || THEME_PRESETS.cyber;
+  const bannerImage = settings.customImageUrl || currentPreset.bannerUrl;
   const { t } = useLanguage();
   const [urlInput, setUrlInput] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
+  const [modalSearchedUrl, setModalSearchedUrl] = useState<string>('');
   const [activeModalProduct, setActiveModalProduct] = useState<any>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
-  const currentPreset = THEME_PRESETS[settings.heroTheme] || THEME_PRESETS.cyber;
+  const executeTrack = (queryToTrack: string) => {
+    const raw = queryToTrack.trim();
+    if (!raw) return;
 
-  // Background style computation
-  const bannerImage = settings.heroTheme === 'custom' && settings.customImageUrl
-    ? settings.customImageUrl
-    : currentPreset.bannerUrl;
+    let cleanQuery = raw;
+    if (!cleanQuery.startsWith('http://') && !cleanQuery.startsWith('https://')) {
+      if (cleanQuery.includes('amazon.') || cleanQuery.includes('amzn.') || cleanQuery.includes('flipkart.') || cleanQuery.includes('myntra.') || cleanQuery.includes('ajio.') || cleanQuery.includes('nykaa.')) {
+        cleanQuery = 'https://' + cleanQuery;
+      }
+    }
 
-  const handleSearchOrTrack = async (e: React.FormEvent) => {
+    // Instant modal opening (BuyHatke-style 0ms feedback)
+    setActiveModalProduct(null);
+    setModalSearchedUrl(cleanQuery);
+    setModalOpen(true);
+  };
+
+  const handleSearchOrTrack = (e: React.FormEvent) => {
     e.preventDefault();
     const query = urlInput.trim();
     if (!query) {
       toast.error('Please paste a product URL or search term');
       return;
     }
+    executeTrack(query);
+  };
 
-    setIsSearching(true);
-    try {
-      let cleanQuery = query;
-      if (!cleanQuery.startsWith('http://') && !cleanQuery.startsWith('https://')) {
-        if (cleanQuery.includes('amazon.') || cleanQuery.includes('amzn.') || cleanQuery.includes('flipkart.') || cleanQuery.includes('myntra.') || cleanQuery.includes('ajio.') || cleanQuery.includes('nykaa.')) {
-          cleanQuery = 'https://' + cleanQuery;
-        }
-      }
-      const res = await productsApi.resolveUrl(cleanQuery);
-      setActiveModalProduct(res.data);
-      setModalOpen(true);
-      if (onProductTracked) onProductTracked();
-    } catch (err: any) {
-      toast.error(err.response?.data?.detail || 'Could not resolve product. Please check the URL or product name.');
-    } finally {
-      setIsSearching(false);
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const pasted = e.clipboardData.getData('text').trim();
+    if (pasted && (
+      pasted.includes('amazon.') || pasted.includes('amzn.') ||
+      pasted.includes('flipkart.') || pasted.includes('fkrt.it') ||
+      pasted.includes('myntra.') ||
+      pasted.includes('ajio.') ||
+      pasted.includes('nykaa.')
+    )) {
+      setUrlInput(pasted);
+      executeTrack(pasted);
     }
   };
 
@@ -120,6 +128,7 @@ export default function HeroTrackerSection({ onProductTracked }: Props) {
                 type="text"
                 value={urlInput}
                 onChange={(e) => setUrlInput(e.target.value)}
+                onPaste={handlePaste}
                 placeholder={t('hero_placeholder', 'Search or paste any Amazon, Flipkart, Myntra, AJIO, Nykaa link...')}
                 className="w-full min-w-0 flex-1 bg-transparent px-2.5 sm:px-3 py-2 sm:py-3 text-xs sm:text-sm md:text-[15px] text-gray-900 placeholder-gray-400 font-medium focus:outline-none"
               />
@@ -148,17 +157,9 @@ export default function HeroTrackerSection({ onProductTracked }: Props) {
               {/* Submit CTA Button */}
               <button
                 type="submit"
-                disabled={isSearching}
-                className="px-3.5 sm:px-6 py-2 sm:py-3 rounded-full bg-[#4139d4] hover:bg-[#342cb8] text-white font-bold text-xs sm:text-sm tracking-wide shadow-md transition-all flex items-center gap-1.5 sm:gap-2 flex-shrink-0 cursor-pointer disabled:opacity-60 whitespace-nowrap"
+                className="px-3.5 sm:px-6 py-2 sm:py-3 rounded-full bg-[#4139d4] hover:bg-[#342cb8] text-white font-bold text-xs sm:text-sm tracking-wide shadow-md transition-all flex items-center gap-1.5 sm:gap-2 flex-shrink-0 cursor-pointer whitespace-nowrap"
               >
-                {isSearching ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" />
-                    <span>Finding...</span>
-                  </>
-                ) : (
-                  <span>{t('find_best_price', 'Find Best Price')}</span>
-                )}
+                <span>{t('find_best_price', 'Find Best Price')}</span>
               </button>
             </div>
           </form>
@@ -175,8 +176,13 @@ export default function HeroTrackerSection({ onProductTracked }: Props) {
       {/* Quick Track Modal */}
       <QuickTrackModal
         isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onClose={() => {
+          setModalOpen(false);
+          setModalSearchedUrl('');
+          setActiveModalProduct(null);
+        }}
         initialProduct={activeModalProduct}
+        searchedUrl={modalSearchedUrl}
         onSuccessTrack={onProductTracked}
       />
     </>

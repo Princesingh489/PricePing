@@ -22,6 +22,23 @@ echo "📥 1. Pulling latest codebase from origin/main..."
 git fetch origin main
 git reset --hard origin/main
 
+echo "💾 1.1 Verifying Linux Swap memory to protect against OOM..."
+if [ $(swapon --show | wc -l) -le 1 ]; then
+  echo "   Setting up 4GB swapfile to guarantee server stability under load..."
+  if [ ! -f /swapfile ]; then
+    sudo fallocate -l 4G /swapfile 2>/dev/null || sudo dd if=/dev/zero of=/swapfile bs=1M count=4096 2>/dev/null
+    sudo chmod 600 /swapfile
+    sudo mkswap /swapfile 2>/dev/null
+  fi
+  sudo swapon /swapfile 2>/dev/null || true
+  if ! grep -q '/swapfile' /etc/fstab 2>/dev/null; then
+    echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab >/dev/null 2>&1 || true
+  fi
+  echo "   ✅ Swap configured successfully."
+else
+  echo "   ✅ Swap memory is already active ($(free -m | awk '/Swap/ {print $2}') MB)."
+fi
+
 echo "🐳 2. Verifying Docker & Docker Compose..."
 if docker compose version &> /dev/null; then
   COMPOSE_CMD="docker compose"

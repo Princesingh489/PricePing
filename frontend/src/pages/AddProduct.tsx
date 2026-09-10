@@ -42,8 +42,12 @@ export default function AddProduct() {
 
   const handleFetch = async (e?: React.FormEvent, customUrl?: string) => {
     if (e) e.preventDefault();
-    const targetUrl = (customUrl || url).trim();
+    let targetUrl = (customUrl || url).trim();
     if (!targetUrl) return;
+
+    if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+      targetUrl = 'https://' + targetUrl;
+    }
 
     const plat = detectPlatform(targetUrl);
     if (plat === 'unknown') {

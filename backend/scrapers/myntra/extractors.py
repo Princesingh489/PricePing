@@ -16,9 +16,64 @@ logger = logging.getLogger(__name__)
 
 class MyntraExtractor:
     @classmethod
+    def _parse_myx_data(cls, soup: BeautifulSoup) -> Optional[Dict[str, Any]]:
+        """Safely parse window.__myx script data containing complete official PDP JSON."""
+        for script in soup.find_all("script"):
+            txt = script.string or script.get_text() or ""
+            if "window.__myx" in txt or "pdpData" in txt:
+                try:
+                    idx = txt.find("window.__myx =")
+                    if idx != -1:
+                        sub = txt[idx + len("window.__myx ="):].strip()
+                        data, _ = json.JSONDecoder().raw_decode(sub)
+                        pdp = data.get("pdpData", data)
+                        if pdp:
+                            return pdp
+                except Exception:
+                    pass
+        return None
+
+    @classmethod
     def extract_candidates(cls, soup: BeautifulSoup, target: Tag | BeautifulSoup) -> Tuple[List[PriceCandidate], Dict[str, Any]]:
         candidates: List[PriceCandidate] = []
         meta_data: Dict[str, Any] = {}
+
+        # 0. window.__myx official PDP Data (Fastest, 100% verified ground truth)
+        pdp = cls._parse_myx_data(soup)
+        if pdp:
+            p_name = pdp.get("name")
+            if p_name:
+                meta_data["json_ld_name"] = p_name
+            brand_obj = pdp.get("brand", {})
+            b_name = brand_obj.get("name") if isinstance(brand_obj, dict) else str(brand_obj or "")
+            if b_name:
+                meta_data["json_ld_brand"] = b_name
+            price_obj = pdp.get("price", {})
+            if isinstance(price_obj, dict):
+                disc_price = price_obj.get("discounted")
+                mrp_price = price_obj.get("mrp")
+                if disc_price and float(disc_price) > 0:
+                    candidates.append(PriceCandidate(
+                        value=float(disc_price),
+                        source="myntra_myx_discounted",
+                        category="selling_price",
+                        confidence=99,
+                        raw_text=str(disc_price)
+                    ))
+                if mrp_price and float(mrp_price) > 0:
+                    candidates.append(PriceCandidate(
+                        value=float(mrp_price),
+                        source="myntra_myx_mrp",
+                        category="mrp",
+                        confidence=99,
+                        raw_text=str(mrp_price)
+                    ))
+            ratings_obj = pdp.get("ratings", {})
+            if isinstance(ratings_obj, dict):
+                if ratings_obj.get("averageRating"):
+                    meta_data["rating"] = round(float(ratings_obj["averageRating"]), 1)
+                if ratings_obj.get("totalCount"):
+                    meta_data["rating_count"] = int(ratings_obj["totalCount"])
 
         # 1. JSON-LD
         for script in soup.select('script[type="application/ld+json"]'):
@@ -27,9 +82,11 @@ class MyntraExtractor:
                 if isinstance(data, list):
                     data = data[0] if data else {}
                 if data.get("@type") == "Product":
-                    meta_data["json_ld_name"] = data.get("name")
+                    if not meta_data.get("json_ld_name"):
+                        meta_data["json_ld_name"] = data.get("name")
                     meta_data["json_ld_image"] = data.get("image")
-                    meta_data["json_ld_brand"] = data.get("brand", {}).get("name") if isinstance(data.get("brand"), dict) else data.get("brand")
+                    if not meta_data.get("json_ld_brand"):
+                        meta_data["json_ld_brand"] = data.get("brand", {}).get("name") if isinstance(data.get("brand"), dict) else data.get("brand")
                     offers = data.get("offers", {})
                     if isinstance(offers, list):
                         offers = offers[0] if offers else {}
@@ -43,8 +100,10 @@ class MyntraExtractor:
                             candidates.append(PriceCandidate(value=mrp_val, source="myntra_json_ld_mrp", category="mrp", confidence=90))
                     agg = data.get("aggregateRating", {})
                     if agg:
-                        meta_data["rating"] = SharedNormalizer.parse_rating(agg.get("ratingValue"))
-                        meta_data["rating_count"] = SharedNormalizer.parse_count(agg.get("ratingCount"))
+                        if meta_data.get("rating") is None:
+                            meta_data["rating"] = SharedNormalizer.parse_rating(agg.get("ratingValue"))
+                        if meta_data.get("rating_count") is None:
+                            meta_data["rating_count"] = SharedNormalizer.parse_count(agg.get("ratingCount"))
             except Exception:
                 pass
 
@@ -182,42 +241,33 @@ class MyntraExtractor:
         seen_sizes = set()
 
         # 1. Parse window.__myx script object if present
-        for script in soup.find_all("script"):
-            txt = script.string or ""
-            if "pdpData" in txt or "__myx" in txt:
-                try:
-                    m = re.search(r'window\.__myx\s*=\s*(\{.*?\});', txt, re.DOTALL) or re.search(r'pdpData\s*[:=]\s*(\{.*?\})', txt, re.DOTALL)
-                    if m:
-                        raw_json = m.group(1)
-                        data = json.loads(raw_json)
-                        pdp_data = data.get("pdpData", data)
-                        sizes = pdp_data.get("sizes") or pdp_data.get("style", {}).get("sizes", [])
-                        for s_info in sizes:
-                            label = str(s_info.get("label") or s_info.get("name") or "").strip()
-                            if not label or label.lower() in seen_sizes:
-                                continue
-                            seen_sizes.add(label.lower())
-                            price_obj = s_info.get("price") or {}
-                            if isinstance(price_obj, dict):
-                                v_price = float(price_obj.get("discounted") or price_obj.get("sellingPrice") or default_price or 0.0)
-                                v_mrp = float(price_obj.get("mrp") or default_mrp or v_price)
-                            else:
-                                v_price = float(s_info.get("discountedPrice") or default_price or 0.0)
-                                v_mrp = float(s_info.get("mrp") or default_mrp or v_price)
+        pdp_data = cls._parse_myx_data(soup)
+        if pdp_data:
+            sizes = pdp_data.get("sizes") or pdp_data.get("style", {}).get("sizes", [])
+            for s_info in sizes:
+                label = str(s_info.get("label") or s_info.get("name") or "").strip()
+                if not label or label.lower() in seen_sizes:
+                    continue
+                seen_sizes.add(label.lower())
+                price_obj = s_info.get("price") or {}
+                if isinstance(price_obj, dict):
+                    v_price = float(price_obj.get("discounted") or price_obj.get("sellingPrice") or default_price or 0.0)
+                    v_mrp = float(price_obj.get("mrp") or default_mrp or v_price)
+                else:
+                    v_price = float(s_info.get("discountedPrice") or default_price or 0.0)
+                    v_mrp = float(s_info.get("mrp") or default_mrp or v_price)
 
-                            is_available = bool(s_info.get("available", True))
-                            if "inventory" in s_info:
-                                is_available = is_available and (s_info.get("inventory", 1) > 0)
+                is_available = bool(s_info.get("available", True))
+                if "inventory" in s_info:
+                    is_available = is_available and (s_info.get("inventory", 1) > 0)
 
-                            variants.append({
-                                "size": label,
-                                "price": v_price if v_price > 0 else (default_price or 0.0),
-                                "mrp": v_mrp if v_mrp > 0 else default_mrp,
-                                "in_stock": is_available,
-                                "sku": str(s_info.get("skuId") or ""),
-                            })
-                except Exception:
-                    pass
+                variants.append({
+                    "size": label,
+                    "price": v_price if v_price > 0 else (default_price or 0.0),
+                    "mrp": v_mrp if v_mrp > 0 else default_mrp,
+                    "in_stock": is_available,
+                    "sku": str(s_info.get("skuId") or ""),
+                })
 
         # 2. DOM fallback: Size buttons
         if not variants:

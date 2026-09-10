@@ -688,6 +688,12 @@ export default function PricePingProductView({
 
   return (
     <div className="w-full bg-[#f4f7fb] text-gray-900 min-h-screen pb-20 font-sans antialiased">
+      {isBusy && (
+        <div className="bg-indigo-600 text-white text-xs font-semibold py-1.5 px-4 flex items-center justify-center gap-2 animate-pulse shadow-sm">
+          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          <span>Scanning live rates across Amazon, Flipkart, Myntra, AJIO &amp; Nykaa...</span>
+        </div>
+      )}
       {/* ── 1. Top Breadcrumb & URL Search Bar (Matching Reference Image) ── */}
       <div className="bg-white border-b border-gray-200/80 sticky top-0 z-30 shadow-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -735,6 +741,8 @@ export default function PricePingProductView({
                 src={selectedImage || product.product_image || DEFAULT_PRODUCT_IMAGE}
                 alt={product.product_name}
                 className="w-full h-full object-contain transition-transform duration-300 group-hover:scale-105"
+                loading="lazy"
+                referrerPolicy="no-referrer"
                 onError={(e) => {
                   (e.target as HTMLImageElement).src = DEFAULT_PRODUCT_IMAGE;
                 }}
@@ -761,6 +769,8 @@ export default function PricePingProductView({
                       src={thumb}
                       alt="thumb"
                       className="w-full h-full object-contain"
+                      loading="lazy"
+                      referrerPolicy="no-referrer"
                       onError={(e) => {
                         (e.target as HTMLImageElement).src = DEFAULT_PRODUCT_IMAGE;
                       }}
@@ -918,6 +928,8 @@ export default function PricePingProductView({
                               src={color.thumbnail}
                               alt={color.name}
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                              loading="lazy"
+                              referrerPolicy="no-referrer"
                               onError={(e) => {
                                 (e.target as HTMLImageElement).style.display = 'none';
                               }}

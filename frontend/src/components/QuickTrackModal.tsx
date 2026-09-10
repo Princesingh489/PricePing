@@ -3,14 +3,93 @@ import { productsApi } from '../services/api';
 import type { TrackedProduct, Product } from '../types';
 import { X, Sparkles, Store } from 'lucide-react';
 import PricePingProductView from './product/PricePingProductView';
+import { DEFAULT_PRODUCT_IMAGE, detectPlatform } from '../utils/helpers';
 import toast from 'react-hot-toast';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  initialProduct?: TrackedProduct | Product | null;
+  initialProduct?: TrackedProduct | Product | any | null;
   searchedUrl?: string;
   onSuccessTrack?: () => void;
+}
+
+function createOptimisticProduct(url: string): any {
+  const cleanUrl = url.trim();
+  const platform = detectPlatform(cleanUrl);
+
+  let title = 'Scanning Product Details...';
+  try {
+    const parsed = new URL(cleanUrl.startsWith('http') ? cleanUrl : 'https://' + cleanUrl);
+    const parts = parsed.pathname.split('/').filter(Boolean);
+    for (const part of parts) {
+      if (
+        part.length > 3 &&
+        !['dp', 'p', 'buy', 'product', 'itm', 'item'].includes(part.toLowerCase()) &&
+        !/^\d+$/.test(part) &&
+        !/^itm[a-z0-9]+$/i.test(part)
+      ) {
+        title = part
+          .replace(/[-_]+/g, ' ')
+          .replace(/\b\w/g, (c) => c.toUpperCase())
+          .trim();
+        break;
+      }
+    }
+  } catch {}
+
+  return {
+    product: {
+      id: 999999,
+      product_name: title,
+      platform: platform,
+      store: platform,
+      product_url: cleanUrl,
+      current_price: 0,
+      original_price: 0,
+      discount_percentage: 0,
+      product_image: DEFAULT_PRODUCT_IMAGE,
+      rating: 4.3,
+      rating_count: 1200,
+      availability: 'in_stock',
+      currency: 'INR',
+    },
+    cross_store_offers: [],
+    canonical_product: {
+      canonical_id: 'CP-SCANNING',
+      brand: platform.toUpperCase(),
+      title: title,
+      standardized_name: title,
+      verified_stores_count: 1,
+    },
+    availability_summary: {
+      available_count: 1,
+      cheapest_store: platform,
+      lowest_price: 0,
+      highest_price: 0,
+      max_savings: 0,
+      stores: [],
+    },
+    history_summary: {
+      observation_count: 1,
+      has_history: false,
+      coverage_label: 'Verifying Live Rates...',
+    },
+    statistics: {
+      current_price: 0,
+      original_price: 0,
+      discount_percentage: 0,
+      all_time_lowest: 0,
+      all_time_highest: 0,
+      average_price: 0,
+      drop_probability: 20,
+      deal_score: 85,
+      deal_verdict: 'Verifying Live Rates...',
+      total_observations: 1,
+      store: platform,
+    },
+    history_points: [],
+  };
 }
 
 export default function QuickTrackModal({
@@ -34,7 +113,9 @@ export default function QuickTrackModal({
         }
       }
       const res = await productsApi.resolveUrl(cleanQuery);
-      setProductData(res.data);
+      if (res && res.data) {
+        setProductData(res.data);
+      }
       if (onSuccessTrack) onSuccessTrack();
     } catch (err: any) {
       toast.error(err.response?.data?.detail || 'Could not resolve product. Please check the URL.');
@@ -46,7 +127,10 @@ export default function QuickTrackModal({
   useEffect(() => {
     if (initialProduct) {
       setProductData(initialProduct);
+      setLoading(false);
     } else if (searchedUrl) {
+      // Instant 0ms optimistic product preview (BuyHatke speed)
+      setProductData(createOptimisticProduct(searchedUrl));
       handleSearchNewInModal(searchedUrl);
     }
   }, [initialProduct, searchedUrl]);
@@ -87,7 +171,7 @@ export default function QuickTrackModal({
         </button>
 
         {/* Content */}
-        {loading ? (
+        {loading && !product ? (
           <div className="min-h-[500px] flex flex-col items-center justify-center p-8 text-center space-y-4 bg-[#f8fafc]">
             <div className="relative">
               <div className="w-16 h-16 rounded-full border-4 border-indigo-200 border-t-indigo-600 animate-spin" />

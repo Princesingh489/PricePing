@@ -69,6 +69,12 @@ class FlipkartExtractor:
             txt = script.string or ""
             if "pricing" in txt or "pageData" in txt or "window.__INITIAL_STATE__" in txt:
                 try:
+                    m_final = re.search(r'["\'](?:finalPrice|specialPrice|sellingPrice)["\']\s*:\s*\{\s*["\']decimalValue["\']\s*:\s*["\']([\d.]+)["\']', txt)
+                    if m_final:
+                        val = float(m_final.group(1))
+                        if val > 0:
+                            candidates.append(PriceCandidate(value=val, source="flipkart_embedded_final_price", category="selling_price", confidence=98))
+
                     m_mrp = re.search(r'["\']mrp["\']\s*:\s*\{\s*["\']decimalValue["\']\s*:\s*["\']([\d.]+)["\']', txt)
                     if m_mrp:
                         val = float(m_mrp.group(1))
