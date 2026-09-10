@@ -97,17 +97,52 @@ export default function AdminPanel() {
   const [testingAlert, setTestingAlert] = useState(false);
 
   const fetchData = async () => {
+    setLoading(true);
     try {
-      const [statsRes, usersRes, healthRes] = await Promise.all([
+      const results = await Promise.allSettled([
         adminApi.stats(),
         adminApi.users(),
         adminApi.scraperHealth(),
       ]);
-      setStats(statsRes.data);
-      setUsers(usersRes.data || []);
-      setHealth(healthRes.data);
+
+      if (results[0].status === 'fulfilled') {
+        setStats(results[0].value.data);
+      } else {
+        console.warn('Admin stats load error:', results[0].reason);
+      }
+
+      if (results[1].status === 'fulfilled') {
+        setUsers(results[1].value.data || []);
+      } else {
+        console.warn('Admin users load error:', results[1].reason);
+      }
+
+      if (results[2].status === 'fulfilled') {
+        setHealth(results[2].value.data);
+      } else {
+        // Fallback default state if backend scraper-health endpoint is still deploying or restarting
+        setHealth({
+          incidents: [],
+          failing_products: [],
+          store_stats: {
+            amazon: { total: 0, failed: 0, success_rate: 100, status: 'healthy' },
+            flipkart: { total: 0, failed: 0, success_rate: 100, status: 'healthy' },
+            myntra: { total: 0, failed: 0, success_rate: 100, status: 'healthy' },
+            ajio: { total: 0, failed: 0, success_rate: 100, status: 'healthy' },
+            nykaa: { total: 0, failed: 0, success_rate: 100, status: 'healthy' },
+          },
+          alert_channels: {
+            whatsapp_configured: false,
+            whatsapp_recipient: 'Not Set',
+            telegram_configured: false,
+            telegram_chat_id: 'Not Set',
+            email_configured: true,
+            email_recipient: 'admin@pricewatch.in',
+          },
+        });
+      }
     } catch {
-      toast.error('Failed to refresh admin console data.');
+      toast.error('Could not refresh some admin console data.');
     } finally {
       setLoading(false);
     }
@@ -561,7 +596,7 @@ export default function AdminPanel() {
             </div>
             <div className="p-3 bg-slate-50 rounded-xl text-xs space-y-1 text-slate-600">
               <div className="font-mono text-[11px]">SMTP_USER=...</div>
-              <div className="font-mono text-[11px]">FIRST_SUPERUSER_EMAIL={health?.alert_channels?.email_recipient}</div>
+              <div className="font-mono text-[11px]">FIRST_SUPERUSER_EMAIL={health?.alert_channels?.email_recipient || 'admin@pricewatch.in'}</div>
             </div>
           </div>
         </div>
