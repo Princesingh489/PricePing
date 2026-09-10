@@ -31,14 +31,32 @@ class ScraperCache:
     @classmethod
     def _get_redis_client(cls):
         global _REDIS_CLIENT
+        if _REDIS_CLIENT is False:
+            return None
         if _REDIS_CLIENT is not None:
             return _REDIS_CLIENT
         try:
+            import os
             import redis
-            _REDIS_CLIENT = redis.from_url(settings.REDIS_URL, decode_responses=True)
+            # Check if running outside Docker with a docker hostname 'redis'
+            redis_url = settings.REDIS_URL
+            is_docker = os.path.exists("/.dockerenv") or os.path.exists("/run/.containerenv")
+            if not is_docker and "@redis:" in redis_url or "://redis:" in redis_url:
+                # Avoid 3-second Windows DNS hang trying to resolve 'redis'
+                redis_url = redis_url.replace("://redis:", "://127.0.0.1:").replace("@redis:", "@127.0.0.1:")
+
+            client = redis.from_url(
+                redis_url,
+                decode_responses=True,
+                socket_connect_timeout=0.15,
+                socket_timeout=0.15,
+            )
+            client.ping()
+            _REDIS_CLIENT = client
             return _REDIS_CLIENT
         except Exception as e:
-            logger.debug(f"Redis client connection failed: {e}. Using in-memory fallback.")
+            logger.info(f"Redis unavailable ({e}). Using ultra-fast in-memory cache fallback.")
+            _REDIS_CLIENT = False
             return None
 
     @classmethod
@@ -61,6 +79,8 @@ class ScraperCache:
                     return json.loads(val)
             except Exception as e:
                 logger.debug(f"Redis get_static_cache error: {e}")
+                global _REDIS_CLIENT
+                _REDIS_CLIENT = False
         mem = _MEMORY_CACHE.get(key)
         if mem:
             return mem
@@ -83,6 +103,8 @@ class ScraperCache:
                 return
             except Exception as e:
                 logger.debug(f"Redis set_static_cache error: {e}")
+                global _REDIS_CLIENT
+                _REDIS_CLIENT = False
         _MEMORY_CACHE[key] = data
         if variant_key:
             _MEMORY_CACHE[cls._make_key("static", platform, product_id, None)] = data
@@ -101,6 +123,8 @@ class ScraperCache:
                     return json.loads(val)
             except Exception as e:
                 logger.debug(f"Redis get_dynamic_cache error: {e}")
+                global _REDIS_CLIENT
+                _REDIS_CLIENT = False
         mem = _MEMORY_CACHE.get(key)
         if mem:
             return mem
@@ -119,6 +143,8 @@ class ScraperCache:
                 return
             except Exception as e:
                 logger.debug(f"Redis set_dynamic_cache error: {e}")
+                global _REDIS_CLIENT
+                _REDIS_CLIENT = False
         _MEMORY_CACHE[key] = data
 
     @classmethod

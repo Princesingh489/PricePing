@@ -127,7 +127,7 @@ class BaseScraper(ABC):
 
     async def fetch_fast_http(self, url: str) -> Optional[str]:
         """
-        Level 1: Fast asynchronous HTTP fetch with 4-second timeout.
+        Level 1: Fast asynchronous HTTP fetch with 12-second timeout.
         """
         headers = {
             "User-Agent": USER_AGENT,
@@ -143,7 +143,7 @@ class BaseScraper(ABC):
             "Upgrade-Insecure-Requests": "1",
         }
         try:
-            async with httpx.AsyncClient(timeout=4.0, follow_redirects=True, headers=headers) as client:
+            async with httpx.AsyncClient(timeout=12.0, follow_redirects=True, headers=headers) as client:
                 resp = await client.get(url)
                 if resp.status_code == 200 and len(resp.text) > 2000:
                     return resp.text

@@ -21,37 +21,38 @@ class PlaywrightManager:
         Fetches the rendered HTML of a dynamic product page.
         Returns: (html_content: Optional[str], fetch_method: str)
         """
-        # 1. Try Host Browser Bridge if available (bypasses Akamai/anti-bot via host Chrome)
-        bridge_hosts = ["http://host.docker.internal:8765", "http://localhost:8765", "http://127.0.0.1:8765"]
-        for b_host in bridge_hosts:
-            try:
-                import urllib.parse
-                encoded_target = urllib.parse.quote(url, safe="")
-                async with httpx.AsyncClient(timeout=18.0) as client:
-                    resp = await client.get(f"{b_host}/render?url={encoded_target}")
-                    if resp.status_code == 200 and len(resp.text) > 3000:
-                        logger.info(f"Host browser bridge rendered {url} successfully ({len(resp.text)} bytes)")
-                        return resp.text, "host_browser"
-            except Exception:
-                pass
-
-        # 2. Try warm PlaywrightPool browser in container
+        # 1. Try warm PlaywrightPool browser (fast, local headless Chromium with blocked ads/trackers)
         try:
             from scrapers.playwright_pool import PlaywrightPool
-            html, method = await PlaywrightPool.fetch_html(url, wait_selector=wait_selector, timeout_ms=min(timeout_ms, 8000))
+            html, method = await PlaywrightPool.fetch_html(url, wait_selector=wait_selector, timeout_ms=min(timeout_ms, 12000))
             if html and len(html) > 1000:
                 return html, method
         except Exception as e:
             logger.warning(f"PlaywrightPool fetch failed for {url}: {e}. Proceeding to fallback.")
 
-        # 2. Try ScraperAPI fallback if configured
+        # 2. Try Host Browser Bridge only if port 8765 is actively listening (sub-millisecond socket check)
+        try:
+            r, w = await asyncio.wait_for(asyncio.open_connection("127.0.0.1", 8765), timeout=0.1)
+            w.close()
+            await w.wait_closed()
+            import urllib.parse
+            encoded_target = urllib.parse.quote(url, safe="")
+            async with httpx.AsyncClient(timeout=8.0) as client:
+                resp = await client.get(f"http://127.0.0.1:8765/render?url={encoded_target}")
+                if resp.status_code == 200 and len(resp.text) > 3000:
+                    logger.info(f"Host browser bridge rendered {url} successfully ({len(resp.text)} bytes)")
+                    return resp.text, "host_browser"
+        except Exception:
+            pass
+
+        # 3. Try ScraperAPI fallback if configured
         scraper_api_key = getattr(settings, 'SCRAPER_API_KEY', '')
         if scraper_api_key:
             try:
                 import urllib.parse
                 encoded_target = urllib.parse.quote(url, safe="")
                 api_url = f"http://api.scraperapi.com?api_key={scraper_api_key}&url={encoded_target}"
-                async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
+                async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
                     resp = await client.get(api_url)
                     if resp.status_code == 200 and len(resp.text) > 3000:
                         logger.info(f"ScraperAPI fetched {url} successfully ({len(resp.text)} bytes)")
