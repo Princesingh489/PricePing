@@ -56,6 +56,8 @@ export interface Product {
   brand?: string;
   model?: string;
   variant?: string;
+  category?: string;
+  in_stock?: boolean;
   variants?: ProductVariant[];
   current_price?: number;
   original_price?: number;

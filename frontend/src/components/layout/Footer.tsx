@@ -21,29 +21,31 @@ export default function Footer() {
             </Link>
 
             <p className="text-gray-400 text-sm max-w-sm leading-relaxed">
-              Track prices. Compare stores. Buy smarter. Instant price drop alerts across India's leading shopping platforms.
+              Price Ping is India&apos;s intelligent price comparison and tracking platform. Monitor price drops across Amazon, Flipkart, Myntra, Ajio, and Nykaa with real-time alerts and verified price history.
             </p>
 
             <div className="flex items-center gap-2 text-xs text-indigo-400 font-semibold pt-1">
               <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span>100% Free & Genuine Price Tracking</span>
+              <span>100% Free & Genuine Real-Time Price Tracking</span>
             </div>
           </div>
 
-          {/* Column 1: Product */}
+          {/* Column 1: Explore & Tools */}
           <div className="space-y-3">
-            <h4 className="text-xs font-black text-white uppercase tracking-wider">Product</h4>
+            <h4 className="text-xs font-black text-white uppercase tracking-wider">Features</h4>
             <ul className="space-y-2 text-sm text-gray-400">
-              <li><Link to="/add-product" className="hover:text-white transition-colors">Track Prices</Link></li>
-              <li><Link to="/history" className="hover:text-white transition-colors">Price History</Link></li>
+              <li><Link to="/price-comparison" className="hover:text-white transition-colors">Price Comparison</Link></li>
+              <li><Link to="/price-tracker" className="hover:text-white transition-colors">Price Tracker</Link></li>
+              <li><Link to="/deals" className="hover:text-white transition-colors">Live Trending Deals</Link></li>
+              <li><Link to="/categories" className="hover:text-white transition-colors">All Categories</Link></li>
               <li><Link to="/compare" className="hover:text-white transition-colors">Compare Stores</Link></li>
-              <li><Link to="/alerts" className="hover:text-white transition-colors">Smart Alerts</Link></li>
+              <li><Link to="/history" className="hover:text-white transition-colors">Price History Search</Link></li>
             </ul>
           </div>
 
           {/* Column 2: Supported Stores */}
           <div className="space-y-3">
-            <h4 className="text-xs font-black text-white uppercase tracking-wider">Supported Stores</h4>
+            <h4 className="text-xs font-black text-white uppercase tracking-wider">Stores Tracked</h4>
             <ul className="space-y-2 text-sm text-gray-400">
               <li><a href="https://www.amazon.in" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors flex items-center gap-1">Amazon India <ExternalLink className="w-3 h-3 opacity-60" /></a></li>
               <li><a href="https://www.flipkart.com" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors flex items-center gap-1">Flipkart <ExternalLink className="w-3 h-3 opacity-60" /></a></li>
@@ -53,14 +55,15 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Column 3: Account & Support */}
+          {/* Column 3: Company & Trust */}
           <div className="space-y-3">
-            <h4 className="text-xs font-black text-white uppercase tracking-wider">Account</h4>
+            <h4 className="text-xs font-black text-white uppercase tracking-wider">Price Ping</h4>
             <ul className="space-y-2 text-sm text-gray-400">
-              <li><Link to="/dashboard" className="hover:text-white transition-colors">Dashboard</Link></li>
-              <li><Link to="/products" className="hover:text-white transition-colors">My Products</Link></li>
-              <li><Link to="/notifications" className="hover:text-white transition-colors">Notifications</Link></li>
-              <li><Link to="/settings" className="hover:text-white transition-colors">Settings</Link></li>
+              <li><Link to="/about" className="hover:text-white transition-colors">About Price Ping</Link></li>
+              <li><Link to="/how-it-works" className="hover:text-white transition-colors">How It Works</Link></li>
+              <li><Link to="/contact" className="hover:text-white transition-colors">Contact Support</Link></li>
+              <li><Link to="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link></li>
+              <li><Link to="/terms" className="hover:text-white transition-colors">Terms of Service</Link></li>
             </ul>
           </div>
         </div>
@@ -68,13 +71,14 @@ export default function Footer() {
         {/* Bottom Bar */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-gray-400">
           <div>
-            © 2026 PricePing. All rights reserved.
+            © {new Date().getFullYear()} Price Ping (priceping.store). All rights reserved.
           </div>
 
           <div className="flex items-center gap-6">
-            <span className="hover:text-white cursor-pointer transition-colors">Privacy Policy</span>
-            <span className="hover:text-white cursor-pointer transition-colors">Terms of Service</span>
-            <span className="hover:text-white cursor-pointer transition-colors">Contact Support</span>
+            <Link to="/privacy" className="hover:text-white transition-colors">Privacy</Link>
+            <Link to="/terms" className="hover:text-white transition-colors">Terms</Link>
+            <Link to="/contact" className="hover:text-white transition-colors">Contact</Link>
+            <Link to="/about" className="hover:text-white transition-colors">About</Link>
           </div>
         </div>
       </div>

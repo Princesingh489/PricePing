@@ -1054,6 +1054,122 @@ def list_my_products(
     return out_list
 
 
+@router.get("/public/{slug_or_id}")
+async def get_public_product(
+    slug_or_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Public SEO Endpoint for Product Pages:
+    Accepts integer ID, store product ID (ASIN/PID), or URL slug.
+    Returns product details, cross-store comparison, and verified history without authentication.
+    """
+    product = None
+    # 1. Try by integer ID
+    if slug_or_id.isdigit():
+        product = db.query(models.Product).filter(models.Product.id == int(slug_or_id)).first()
+
+    # 2. Try by external_product_id (ASIN / PID / SKU)
+    if not product:
+        product = db.query(models.Product).filter(models.Product.external_product_id == slug_or_id).first()
+
+    # 3. Try matching by slug / product name keywords
+    if not product:
+        clean_keywords = slug_or_id.replace("-", " ").strip()
+        product = db.query(models.Product).filter(models.Product.product_name.ilike(f"%{clean_keywords}%")).first()
+
+    # 4. Fallback: Check VERIFIED_STORE_CATALOG
+    if not product:
+        try:
+            from services.trending_engine import VERIFIED_STORE_CATALOG
+            clean_slug = slug_or_id.lower()
+            for seed in VERIFIED_STORE_CATALOG:
+                deal_key = (seed.get("deal_key") or "").lower()
+                seed_title = (seed.get("title") or "").lower()
+                if deal_key in clean_slug or clean_slug in deal_key or all(w in seed_title for w in clean_slug.split("-") if len(w) > 3):
+                    product = db.query(models.Product).filter(models.Product.product_url == seed["product_url"]).first()
+                    if not product:
+                        product = models.Product(
+                            platform=seed["store"],
+                            store=seed["store"],
+                            external_product_id=seed.get("deal_key"),
+                            product_name=seed["title"],
+                            product_url=seed["product_url"],
+                            product_image=seed["image_url"],
+                            current_price=seed["price"],
+                            original_price=seed.get("mrp", seed["price"] * 1.3),
+                            discount_percentage=seed.get("discount_percent", 0.0),
+                            rating=seed.get("rating", 4.2),
+                            rating_count=seed.get("rating_count", 1500),
+                            currency="INR",
+                            availability=seed.get("availability", "in_stock"),
+                            created_at=datetime.utcnow(),
+                            last_checked=datetime.utcnow(),
+                        )
+                        db.add(product)
+                        db.commit()
+                        db.refresh(product)
+                    break
+        except Exception as seed_err:
+            logger.debug(f"Seed catalog lookup error: {seed_err}")
+
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    # Load genuine price history
+    price_history = (
+        db.query(models.PriceHistory)
+        .filter(models.PriceHistory.product_id == product.id)
+        .order_by(models.PriceHistory.checked_at.asc())
+        .all()
+    )
+
+    # Calculate real statistics
+    hist_res = await historical_provider.get_verified_history(db, product, store="all", period="all")
+    real_stats = historical_provider.calculate_real_statistics(product, hist_res["data"])
+
+    # Load store comparison offers
+    offers_records = db.query(models.ProductOffer).filter(models.ProductOffer.product_id == product.id).all()
+    if not offers_records:
+        try:
+            comparison_offers = await sync_cross_store_offers(db, product)
+        except Exception:
+            comparison_offers = []
+    else:
+        comparison_offers = [map_offer_to_out(o) for o in offers_records]
+
+    product_slug = re.sub(r'[^a-zA-Z0-9]+', '-', product.product_name.lower()).strip('-')
+    canonical_url = f"https://priceping.store/product/{product_slug}"
+    meta_title = f"{product.product_name} Price Comparison – Price Ping"
+    meta_description = f"Compare {product.product_name} prices across Amazon, Flipkart, Myntra, Ajio and Nykaa with Price Ping."
+
+    return {
+        "product": map_product_to_out(product),
+        "canonical_url": canonical_url,
+        "meta_title": meta_title,
+        "meta_description": meta_description,
+        "price_history": [
+            {
+                "id": h.id,
+                "price": h.price,
+                "original_price": h.original_price,
+                "checked_at": h.checked_at.isoformat() if h.checked_at else None,
+                "store": h.store,
+            }
+            for h in price_history
+        ],
+        "real_statistics": real_stats,
+        "cross_store_offers": [c.dict() if hasattr(c, "dict") else c for c in comparison_offers],
+        "history_metadata": {
+            "history_start_date": hist_res.get("history_start_date"),
+            "history_end_date": hist_res.get("history_end_date"),
+            "observation_count": len(price_history),
+            "coverage_label": hist_res.get("coverage_label", "Recent"),
+            "has_history": len(price_history) >= 2,
+        },
+    }
+
+
 @router.get("/{tracker_id}", response_model=TrackedProductOut)
 def get_product(
     tracker_id: int,

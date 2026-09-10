@@ -1,0 +1,40 @@
+# Robots.txt for Price Ping (https://priceping.store)
+User-agent: *
+Allow: /
+Allow: /product/
+Allow: /category/
+Allow: /categories
+Allow: /deals
+Allow: /compare
+Allow: /history
+Allow: /about
+Allow: /how-it-works
+Allow: /price-tracker
+Allow: /price-comparison
+Allow: /contact
+Allow: /privacy
+Allow: /terms
+Allow: /assets/
+Allow: /*.js$
+Allow: /*.css$
+Allow: /*.png$
+Allow: /*.jpg$
+Allow: /*.jpeg$
+Allow: /*.svg$
+Allow: /*.webp$
+
+# Disallow private user dashboard and authentication pages
+Disallow: /dashboard
+Disallow: /settings
+Disallow: /alerts
+Disallow: /notifications
+Disallow: /admin
+Disallow: /products
+Disallow: /add-product
+Disallow: /login
+Disallow: /register
+Disallow: /forgot-password
+Disallow: /auth/
+Disallow: /api/
+
+Sitemap: https://priceping.store/sitemap.xml

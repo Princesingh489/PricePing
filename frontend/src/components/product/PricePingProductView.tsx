@@ -570,48 +570,17 @@ export default function PricePingProductView({
     };
   }, [availabilitySummary, fiveStoreOffers]);
 
-  // ──── Enriched Historical Price Points (Populated Graph) ────
+  // ──── Real Historical Price Points Only (No fake or synthetic data) ────
   const populatedHistory = useMemo(() => {
-    if (historyPoints && historyPoints.length >= 8) {
+    if (historyPoints && Array.isArray(historyPoints) && historyPoints.length > 0) {
       return historyPoints;
     }
-
-    // Generate realistic historical observation curve spanning 180 days
-    const now = new Date();
-    const points: RealPriceHistoryPoint[] = [];
-    const baseP = curPrice;
-    const lowP = lowestPrice;
-    const highP = highestPrice;
-
-    // Timeline spanning 28 weekly observation checkpoints since product launch
-    const count = 28;
-    for (let i = count; i >= 0; i--) {
-      const d = new Date(now.getTime() - i * 7 * 24 * 3600 * 1000);
-      const dateLabel = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-
-      let p = baseP;
-      if (i > 24) p = highP; // Initial listing period near launch price
-      else if (i === 16 || i === 15) p = lowP; // Festival flash sale drop (Great Indian Festival / Big Billion Days)
-      else if (i === 10 || i === 9) p = Math.round((lowP + baseP) / 2); // Seasonal promotion discount
-      else if (i > 18) p = Math.round(highP * 0.96);
-      else if (i > 4) p = Math.round(baseP * 1.04);
-      else p = baseP; // Recent verified observations matching Celery checks
-
-      points.push({
-        timestamp: d.toISOString(),
-        date: dateLabel,
-        price: p,
-        original_price: origPrice,
-        store: platformInfo.name,
-        source: 'priceping_observation',
-        availability: 'in_stock',
-      });
-    }
-    return points;
-  }, [historyPoints, curPrice, lowestPrice, highestPrice, origPrice, platformInfo.name]);
+    return [];
+  }, [historyPoints]);
 
   // Filter history points based on period
   const filteredHistory = useMemo(() => {
+    if (populatedHistory.length === 0) return [];
     const now = new Date();
     const daysMap: Record<string, number> = { '1M': 30, '3M': 90, '6M': 180, '1Y': 365, 'Max': 1000 };
     const days = daysMap[timeFilter] || 90;
@@ -1341,57 +1310,76 @@ export default function PricePingProductView({
             </div>
           </div>
 
-          {/* Area Chart with stepAfter and gradient matching reference picture */}
-          <div className="h-72 sm:h-80 w-full pt-4">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={filteredHistory} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="pricepingGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#f43f5e" stopOpacity={0.35} />
-                    <stop offset="60%" stopColor="#f59e0b" stopOpacity={0.20} />
-                    <stop offset="100%" stopColor="#10b981" stopOpacity={0.05} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                <XAxis
-                  dataKey="date"
-                  tick={{ fill: '#64748b', fontSize: 11, fontWeight: 700 }}
-                  tickLine={false}
-                  axisLine={{ stroke: '#e2e8f0' }}
-                />
-                <YAxis
-                  tick={{ fill: '#64748b', fontSize: 11, fontWeight: 700 }}
-                  tickLine={false}
-                  axisLine={false}
-                  domain={['dataMin - 30', 'dataMax + 30']}
-                  tickFormatter={(val) => `₹${val}`}
-                />
-                <Tooltip
-                  content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
-                      const pt = payload[0].payload;
-                      return (
-                        <div className="bg-[#0f172a] text-white p-3 rounded-2xl shadow-xl text-xs space-y-1 border border-white/10">
-                          <div className="text-[10px] text-gray-400 font-bold">{pt.date || pt.timestamp}</div>
-                          <div className="text-base font-black text-amber-300">{formatINR(pt.price)}</div>
-                          <div className="text-[10px] text-emerald-400 font-semibold">✓ Verified Price Observation</div>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
-                />
-                <Area
-                  type="stepAfter"
-                  dataKey="price"
-                  stroke="#f43f5e"
-                  strokeWidth={2.5}
-                  fill="url(#pricepingGrad)"
-                  activeDot={{ r: 5, fill: '#f43f5e', stroke: '#ffffff', strokeWidth: 2 }}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
+          {/* Area Chart with real observations only */}
+          {filteredHistory.length >= 2 ? (
+            <div className="h-72 sm:h-80 w-full pt-4">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={filteredHistory} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="pricepingGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#f43f5e" stopOpacity={0.35} />
+                      <stop offset="60%" stopColor="#f59e0b" stopOpacity={0.20} />
+                      <stop offset="100%" stopColor="#10b981" stopOpacity={0.05} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fill: '#64748b', fontSize: 11, fontWeight: 700 }}
+                    tickLine={false}
+                    axisLine={{ stroke: '#e2e8f0' }}
+                  />
+                  <YAxis
+                    tick={{ fill: '#64748b', fontSize: 11, fontWeight: 700 }}
+                    tickLine={false}
+                    axisLine={false}
+                    domain={['dataMin - 30', 'dataMax + 30']}
+                    tickFormatter={(val) => `₹${val}`}
+                  />
+                  <Tooltip
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const pt = payload[0].payload;
+                        return (
+                          <div className="bg-[#0f172a] text-white p-3 rounded-2xl shadow-xl text-xs space-y-1 border border-white/10">
+                            <div className="text-[10px] text-gray-400 font-bold">{pt.date || pt.timestamp}</div>
+                            <div className="text-base font-black text-amber-300">{formatINR(pt.price)}</div>
+                            <div className="text-[10px] text-emerald-400 font-semibold">✓ Verified Price Observation</div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Area
+                    type="stepAfter"
+                    dataKey="price"
+                    stroke="#f43f5e"
+                    strokeWidth={2.5}
+                    fill="url(#pricepingGrad)"
+                    activeDot={{ r: 5, fill: '#f43f5e', stroke: '#ffffff', strokeWidth: 2 }}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="py-12 px-4 text-center rounded-2xl bg-slate-50 border border-dashed border-slate-200">
+              <div className="w-12 h-12 mx-auto mb-3 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600">
+                <TrendingDown className="w-6 h-6" />
+              </div>
+              <h3 className="text-base font-bold text-slate-800">
+                Price history will appear as Price Ping collects more data.
+              </h3>
+              <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
+                {populatedHistory.length === 1
+                  ? 'Price Ping has recorded 1 verified price observation for this product so far. As ongoing periodic price checks occur across stores, a comprehensive price trend graph will appear here.'
+                  : 'Real price data points are logged transparently each time this product is refreshed or tracked across partner stores without fabrication.'}
+              </p>
+              <div className="mt-4 inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 border border-emerald-100 rounded-full text-emerald-700 text-xs font-semibold">
+                <span>🛡️ 100% Verified Observations Only — Zero Synthetic Points</span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

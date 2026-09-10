@@ -20,6 +20,17 @@ import Settings from './pages/Settings';
 import AdminPanel from './pages/AdminPanel';
 import ProductDetailPage from './pages/ProductDetailPage';
 import GoogleCallback from './pages/GoogleCallback';
+import About from './pages/About';
+import HowItWorks from './pages/HowItWorks';
+import PriceTrackerInfo from './pages/PriceTrackerInfo';
+import PriceComparisonInfo from './pages/PriceComparisonInfo';
+import DealsPage from './pages/DealsPage';
+import CategoriesPage from './pages/CategoriesPage';
+import CategoryDetailPage from './pages/CategoryDetailPage';
+import Contact from './pages/Contact';
+import Terms from './pages/Terms';
+import Privacy from './pages/Privacy';
+import PublicProductPage from './pages/PublicProductPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -167,9 +178,24 @@ function AppRoutes() {
         }
       />
 
-      {/* Product Detail Page */}
+      {/* Public Static & Brand SEO Pages */}
+      <Route path="/about" element={<Layout><About /></Layout>} />
+      <Route path="/how-it-works" element={<Layout><HowItWorks /></Layout>} />
+      <Route path="/price-tracker" element={<Layout><PriceTrackerInfo /></Layout>} />
+      <Route path="/price-comparison" element={<Layout><PriceComparisonInfo /></Layout>} />
+      <Route path="/deals" element={<Layout><DealsPage /></Layout>} />
+      <Route path="/categories" element={<Layout><CategoriesPage /></Layout>} />
+      <Route path="/category/:category" element={<Layout><CategoryDetailPage /></Layout>} />
+      <Route path="/contact" element={<Layout><Contact /></Layout>} />
+      <Route path="/terms" element={<Layout><Terms /></Layout>} />
+      <Route path="/privacy" element={<Layout><Privacy /></Layout>} />
+
+      {/* Public Product Page (Indexable, SEO Optimized) */}
+      <Route path="/product/:slug" element={<Layout><PublicProductPage /></Layout>} />
+
+      {/* Authenticated Tracker Detail Page */}
       <Route
-        path="/product/:trackerId"
+        path="/tracker/:trackerId"
         element={
           <ProtectedRoute>
             <Layout>

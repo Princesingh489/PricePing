@@ -265,8 +265,8 @@ def test_delete_tracking_preserves_global_product_and_price_history():
     db.commit()
 
     # Price history records exist
-    h1 = models.PriceHistory(product_id=500, store="amazon", price=1999.0, checked_at=datetime(2026, 1, 1), verified=True)
-    h2 = models.PriceHistory(product_id=500, store="amazon", price=1799.0, checked_at=datetime(2026, 2, 1), verified=True)
+    h1 = models.PriceHistory(product_id=500, store="amazon", price=1999.0, checked_at=datetime(2026, 1, 1), recorded_at=datetime(2026, 1, 1), verified=True)
+    h2 = models.PriceHistory(product_id=500, store="amazon", price=1799.0, checked_at=datetime(2026, 2, 1), recorded_at=datetime(2026, 2, 1), verified=True)
     db.add_all([h1, h2])
     db.commit()
 

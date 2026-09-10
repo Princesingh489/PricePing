@@ -103,13 +103,13 @@ export default function HeroTrackerSection({ onProductTracked }: Props) {
           </div>
 
           {/* Main Headline */}
-          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-[54px] font-black text-white tracking-tight leading-[1.15] max-w-4xl drop-shadow-md">
-            {t('hero_title', 'Never Overpay. Let PricePing Find the Right Price.')}
+          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-[52px] font-black text-white tracking-tight leading-[1.15] max-w-4xl drop-shadow-md">
+            {t('hero_title', 'Price Ping – Compare Prices & Track Products Across Stores')}
           </h1>
 
           {/* Subtitle */}
-          <p className="mt-3 text-base sm:text-lg text-gray-200 font-normal drop-shadow">
-            {t('hero_subtitle', 'Compare prices, watch price history, and get alerted when it’s finally worth buying.')}
+          <p className="mt-3 text-sm sm:text-base md:text-lg text-gray-200 font-normal max-w-3xl drop-shadow leading-relaxed">
+            {t('hero_subtitle', 'Price Ping compares real-time prices across Amazon, Flipkart, Myntra, Ajio, and Nykaa to help you find better deals. Track any product, view genuine price history, and monitor price drops effortlessly.')}
           </p>
 
           {/* Main Search & URL Tracker Input Bar */}
