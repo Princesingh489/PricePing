@@ -48,10 +48,16 @@ class Settings(BaseSettings):
     EMAILS_FROM_EMAIL: str = "noreply@pricewatch.in"
     EMAILS_FROM_NAME: str = "PriceWatch India"
 
-    # Twilio (optional)
+    # Twilio (optional for SMS & WhatsApp)
     TWILIO_ACCOUNT_SID: str = ""
     TWILIO_AUTH_TOKEN: str = ""
     TWILIO_PHONE_NUMBER: str = ""
+    TWILIO_WHATSAPP_FROM: str = "whatsapp:+14155238886"  # Twilio Sandbox or verified WhatsApp number
+    ADMIN_WHATSAPP_NUMBER: str = ""                       # e.g. "whatsapp:+919876543210"
+
+    # Telegram Bot Alerts (100% Free instant admin notifications)
+    TELEGRAM_BOT_TOKEN: str = ""                          # e.g. "123456789:ABCdefGHIjklMNOpqrSTUvwxYZ"
+    TELEGRAM_ADMIN_CHAT_ID: str = ""                      # e.g. "987654321"
 
     # Price Tracking
     PRICE_CHECK_INTERVAL_MINUTES: int = 30

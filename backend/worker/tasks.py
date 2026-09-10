@@ -85,7 +85,19 @@ def perform_product_price_check(product_id: int):
 
         # Fail closed: Do not overwrite verified price if fetch failed or confidence is uncertain
         if not new_data or not new_data.success or new_data.current_price is None or (new_data.confidence_score and new_data.confidence_score < 70):
-            logger.warning(f"Product {product_id} price fetch uncertain (confidence: {getattr(new_data, 'confidence_score', 0)}). Keeping previous verified price.")
+            err_msg = getattr(new_data, "error", None) or getattr(new_data, "error_message", None) or "Uncertain extraction confidence or bot check"
+            logger.warning(f"Product {product_id} price fetch uncertain ({err_msg}). Keeping previous verified price.")
+            try:
+                from services.admin_alert_service import record_incident
+                record_incident(
+                    store=product.platform.value if hasattr(product.platform, "value") else str(product.platform),
+                    url=product.product_url,
+                    error_reason=err_msg,
+                    product_name=product.product_name,
+                    severity="WARNING",
+                )
+            except Exception:
+                pass
             product.last_checked = datetime.utcnow()
             db.commit()
             return

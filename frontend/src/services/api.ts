@@ -132,6 +132,9 @@ export const dashboardApi = {
 export const adminApi = {
   stats: () => api.get('/api/admin/stats'),
   users: () => api.get('/api/admin/users'),
+  scraperHealth: () => api.get('/api/admin/scraper-health'),
+  retryScrape: (productId: number) => api.post(`/api/admin/retry-scrape/${productId}`),
+  testAlert: () => api.post('/api/admin/test-alert'),
 };
 
 // ---- Trending Deals ----
