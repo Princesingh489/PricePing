@@ -64,8 +64,9 @@ class ECommerceURLNormalizer:
         if not asin and "asin" in query_params:
             asin = query_params["asin"][0].upper()
 
-        # Shortlink fallback (e.g. amzn.in/d/xyz or amzn.to/xyz)
-        if not asin and ("amzn.in" in parsed.netloc.lower() or "amzn.to" in parsed.netloc.lower() or "a.co" in parsed.netloc.lower()):
+        # Shortlink fallback (e.g. amzn.in/d/xyz or amzn.to/xyz or a.co/xyz)
+        netloc_lower = parsed.netloc.lower()
+        if not asin and ("amzn.in" in netloc_lower or "amzn.to" in netloc_lower or netloc_lower in ("a.co", "www.a.co") or netloc_lower.endswith(".a.co")):
             short_code = parsed.path.strip("/").split("/")[-1]
             return NormalizedURLResult(
                 canonical_url=raw,
@@ -173,12 +174,21 @@ class ECommerceURLNormalizer:
         parsed = urlparse(raw)
         path = parsed.path
 
-        # Extract numeric Style ID from path
-        style_match = re.search(r'/(\d{5,12})(?:/buy)?/?$', path)
+        # Extract numeric Style ID from path (must be 5-14 digits, NEVER 'buy')
+        style_match = re.search(r'/(\d{5,14})(?:/buy)?/?$', path)
         if not style_match:
-            style_match = re.search(r'/(\d{5,12})', path)
+            style_match = re.search(r'/(\d{5,14})', path)
 
-        style_id = style_match.group(1) if style_match else (path.strip("/").split("/")[-1] or "myntra_item")
+        if style_match:
+            style_id = style_match.group(1)
+        else:
+            # Fallback: scan for any digit token or slug parts excluding 'buy'
+            num_tokens = re.findall(r'\b\d{5,14}\b', path)
+            if num_tokens:
+                style_id = num_tokens[-1]
+            else:
+                non_buy_parts = [p for p in path.strip("/").split("/") if p and p.lower() != "buy"]
+                style_id = non_buy_parts[-1] if non_buy_parts else "myntra_item"
 
         # Standardize path ending with /buy
         if style_match:
@@ -277,17 +287,17 @@ class ECommerceURLNormalizer:
         if not url.startswith(("http://", "https://")):
             url = "https://" + url
 
-        lower_url = url.lower()
+        parsed_netloc = urlparse(url).netloc.lower()
 
-        if "amazon." in lower_url or "amzn.in" in lower_url or "amzn.to" in lower_url or "a.co" in lower_url:
+        if "amazon." in parsed_netloc or "amzn.in" in parsed_netloc or "amzn.to" in parsed_netloc or parsed_netloc in ("a.co", "www.a.co") or parsed_netloc.endswith(".a.co"):
             return cls.normalize_amazon(url)
-        elif "flipkart." in lower_url or "fkrt.it" in lower_url or "fkrt.co" in lower_url:
+        elif "flipkart." in parsed_netloc or "fkrt.it" in parsed_netloc or "fkrt.co" in parsed_netloc:
             return cls.normalize_flipkart(url)
-        elif "myntra." in lower_url:
+        elif "myntra." in parsed_netloc:
             return cls.normalize_myntra(url)
-        elif "ajio." in lower_url:
+        elif "ajio." in parsed_netloc:
             return cls.normalize_ajio(url)
-        elif "nykaa." in lower_url:
+        elif "nykaa." in parsed_netloc:
             return cls.normalize_nykaa(url)
         else:
             raise ValueError(f"Unsupported e-commerce platform domain for URL: {raw_url}")

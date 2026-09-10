@@ -76,12 +76,22 @@ export function getPlatformBadgeClass(platform: Platform): string {
 
 export function detectPlatform(url: string): Platform {
   if (!url) return 'unknown';
-  const l = url.toLowerCase();
-  if (l.includes('amazon.') || l.includes('amzn.') || l.includes('amzn.to') || l.includes('a.co')) return 'amazon';
-  if (l.includes('flipkart.') || l.includes('fkrt.it') || l.includes('fkrt.co')) return 'flipkart';
-  if (l.includes('ajio.') || l.includes('ajio.page.link')) return 'ajio';
-  if (l.includes('myntra.')) return 'myntra';
-  if (l.includes('nykaa.')) return 'nykaa';
+  const l = url.toLowerCase().trim();
+  try {
+    const fullUrl = l.startsWith('http://') || l.startsWith('https://') ? l : `https://${l}`;
+    const host = new URL(fullUrl).hostname.toLowerCase();
+    if (host.includes('amazon.') || host.includes('amzn.') || host.includes('amzn.to') || host === 'a.co' || host.endsWith('.a.co')) return 'amazon';
+    if (host.includes('flipkart.') || host.includes('fkrt.it') || host.includes('fkrt.co')) return 'flipkart';
+    if (host.includes('ajio.') || host.includes('ajio.page.link')) return 'ajio';
+    if (host.includes('myntra.')) return 'myntra';
+    if (host.includes('nykaa.')) return 'nykaa';
+  } catch {
+    if (l.includes('amazon.') || l.includes('amzn.in') || l.includes('amzn.to')) return 'amazon';
+    if (l.includes('flipkart.') || l.includes('fkrt.it')) return 'flipkart';
+    if (l.includes('ajio.')) return 'ajio';
+    if (l.includes('myntra.')) return 'myntra';
+    if (l.includes('nykaa.')) return 'nykaa';
+  }
   return 'unknown';
 }
 

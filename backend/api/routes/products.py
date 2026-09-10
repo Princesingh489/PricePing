@@ -366,6 +366,7 @@ async def resolve_url(
 
     # 1. Fast-path DB hit (<5ms):
     # Check by exact URL, canonical clean URL, or (external_product_id + store)
+    GENERIC_IDS = {"buy", "item", "p", "flipkart_item", "myntra_item", "nykaa_item", "product", "dp"}
     existing_product = db.query(models.Product).filter(
         models.Product.product_url == url
     ).first()
@@ -375,14 +376,14 @@ async def resolve_url(
             models.Product.product_url == clean_url
         ).first()
 
-    if not existing_product and ext_id:
+    if not existing_product and ext_id and ext_id.lower() not in GENERIC_IDS and len(ext_id) >= 4:
         existing_product = db.query(models.Product).filter(
             models.Product.external_product_id == ext_id,
             models.Product.store == store_name
         ).first()
 
     product_data = None
-    if existing_product and existing_product.product_name and existing_product.current_price is not None:
+    if existing_product and existing_product.product_name and not existing_product.product_name.startswith("Fetching") and existing_product.current_price is not None and existing_product.current_price > 0:
         logger.info(f"Fast-path DB hit for {url} ({existing_product.product_name})")
         product_data = ProductData(
             platform=detected_platform,
@@ -401,6 +402,7 @@ async def resolve_url(
         )
 
     # 2. Fast-path Verified Store Catalog hit (<1ms):
+    # STRICT EXACT MATCH ONLY: Only return if canonical URL or verified product ID matches.
     if not product_data:
         try:
             from services.trending_engine import VERIFIED_STORE_CATALOG
@@ -410,10 +412,15 @@ async def resolve_url(
             for seed in VERIFIED_STORE_CATALOG:
                 seed_url = seed["product_url"].lower()
                 seed_clean = seed_url.split("?")[0].rstrip("/")
-                if (clean_target == seed_clean or 
-                    url_lower == seed_url or 
-                    (ext_id_lower and ext_id_lower in seed_url) or 
-                    (clean_target.split("/")[-1] and clean_target.split("/")[-1] in seed_clean)):
+                seed_deal_key = (seed.get("deal_key") or "").lower()
+
+                is_exact_url = (clean_target == seed_clean or url_lower == seed_url)
+                is_exact_id = False
+                if ext_id_lower and ext_id_lower not in GENERIC_IDS and len(ext_id_lower) >= 5:
+                    if seed_deal_key == ext_id_lower or f"/{ext_id_lower}" in seed_clean or f"={ext_id_lower}" in seed_url:
+                        is_exact_id = True
+
+                if is_exact_url or is_exact_id:
                     logger.info(f"Fast-path Catalog hit for {url} ({seed['title'][:30]})")
                     product_data = ProductData(
                         platform=detected_platform,
@@ -434,19 +441,19 @@ async def resolve_url(
         except Exception as seed_err:
             logger.debug(f"Catalog check skipped: {seed_err}")
 
-    # 3. If not cached, fetch product data with tight 1.4s timeout:
+    # 3. If not cached, fetch live product data with scraper:
     if not product_data:
         try:
             import asyncio
-            product_data = await asyncio.wait_for(async_fetch_product_data(url), timeout=1.4)
+            product_data = await asyncio.wait_for(async_fetch_product_data(url), timeout=8.0)
         except Exception as scrape_err:
-            logger.debug(f"Direct scrape skipped/timed out for {url}: {scrape_err}")
+            logger.warning(f"Direct scrape skipped or timed out for {url}: {scrape_err}")
             product_data = None
 
-    # 4. Instant Resilient Fallback (BuyHatke style <10ms):
-    # If live fetch timed out, was challenged by bot protection, or failed:
+    # 4. Strict Resolution Check:
+    # Under NO circumstances substitute an unrelated catalog product or fake price!
     if not product_data or not product_data.success or not product_data.product_name or product_data.current_price is None:
-        if existing_product and existing_product.product_name and existing_product.current_price is not None:
+        if existing_product and existing_product.product_name and not existing_product.product_name.startswith("Fetching") and existing_product.current_price is not None and existing_product.current_price > 0:
             logger.info(f"Recovering with existing database record for {url}")
             product_data = ProductData(
                 platform=detected_platform,
@@ -464,33 +471,10 @@ async def resolve_url(
                 store_product_id=existing_product.external_product_id or ext_id,
             )
         else:
-            # Extract clean title from URL slug instantly
-            extracted_title = extract_title_from_url(url, store_name)
-            # Find best matched default image from verified catalog for this store
-            fallback_img = None
-            try:
-                from services.trending_engine import VERIFIED_STORE_CATALOG
-                for seed in VERIFIED_STORE_CATALOG:
-                    if seed.get("store") == store_name:
-                        fallback_img = seed.get("image_url")
-                        break
-            except Exception:
-                pass
-
-            product_data = ProductData(
-                platform=detected_platform,
-                product_name=extracted_title,
-                product_url=url,
-                product_image=fallback_img,
-                current_price=999.0,
-                original_price=1999.0,
-                discount_percentage=50.0,
-                rating=4.2,
-                rating_count=1800,
-                currency="INR",
-                availability="in_stock",
-                success=True,
-                store_product_id=ext_id,
+            logger.warning(f"Could not resolve product details for URL: {url}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Could not fetch details for this product. Please check the URL or try again.",
             )
 
     # Extract specs for identity matching
