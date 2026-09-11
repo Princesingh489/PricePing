@@ -1,6 +1,6 @@
 param (
     [string]$KeyPath = "",
-    [string]$HostIp = "13.201.130.193",
+    [string]$HostIp = "15.252.173.128",
     [string]$User = "ubuntu"
 )
 

@@ -7,7 +7,7 @@ import PricePingProductView from '../components/product/PricePingProductView';
 import { ProductCardSkeleton } from '../components/common/SkeletonLoader';
 import type { Product, StoreOffer, RealPriceStatistics, RealPriceHistoryPoint } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://65.0.199.91:8000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 interface PublicProductResponse {
   product: Product;
