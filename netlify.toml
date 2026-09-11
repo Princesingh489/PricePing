@@ -6,7 +6,7 @@
 # Proxy /api requests directly to AWS EC2 (bypasses browser mixed-content blocks)
 [[redirects]]
   from = "/api/*"
-  to = "http://65.0.199.91:8000/api/:splat"
+  to = "http://13.201.130.193:8000/api/:splat"
   status = 200
   force = true
 
