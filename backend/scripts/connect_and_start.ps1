@@ -8,4 +8,4 @@ icacls.exe $keyPath /remove "BUILTIN\Users"
 icacls.exe $keyPath /grant:r "$($env:USERNAME):(R)"
 
 Write-Host "Connecting via SSH..."
-ssh -i $keyPath -o StrictHostKeyChecking=no ubuntu@15.252.173.128 "echo SSH_CONNECTED && cd ~/PricePing && docker compose up -d && docker compose ps"
+ssh -i $keyPath -o StrictHostKeyChecking=no ubuntu@13.203.184.3 "echo SSH_CONNECTED && cd ~/PricePing && docker compose up -d && docker compose ps"
